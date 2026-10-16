@@ -1,0 +1,2428 @@
+/*
+ * Revealation — core application styles
+ * =====================================
+ *
+ * Owns the editor shell, top bar, dialogs, WYSIWYG stage, responsive layout
+ * and shared controls. Domain-specific styles that can stand alone belong in
+ * neighboring files (for example `sidebar.css` and `interactive.css`).
+ */
+
+:root {
+  color-scheme: dark;
+  --bg: #1b1d23;
+  --panel: #23262e;
+  --panel-2: #2b2f39;
+  --border: #353a46;
+  --text: #e8eaf0;
+  --muted: #9aa1b1;
+  --accent: #4f8cff;
+  --danger: #c25a5a;
+  --ok: #4caf76;
+  --input-bg: #14161b;
+  --stage-bg: #14161b;
+  --button-hover: #353a46;
+}
+
+body.light {
+  color-scheme: light;
+  --bg: #f4f5f8;
+  --panel: #ffffff;
+  --panel-2: #f0f2f6;
+  --border: #d6dae1;
+  --text: #1a1d23;
+  --muted: #5b6370;
+  --accent: #2563eb;
+  --danger: #b91c1c;
+  --ok: #047857;
+  --input-bg: #ffffff;
+  --stage-bg: #e9ebef;
+  --button-hover: #e3e6ec;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+/* Startup is intentionally opaque: PWA registration and recent-folder lookup
+   happen before the editor shell is revealed, so users never see a half-built
+   toolbar or an empty black slide frame. */
+.app-starting > .topbar,
+.app-starting > .layout,
+.app-starting > .app-status-toast,
+.app-starting > .pwa-update-banner { visibility: hidden; }
+.app-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  background: var(--app-bg, #1b1d23);
+  color: var(--text, #f4f5f8);
+  text-align: center;
+}
+.app-loading-screen > span { color: var(--muted, #a7acb8); font-size: 13px; }
+.app-loading-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border, #3a3e49);
+  border-radius: 14px;
+  color: var(--accent, #8ab4f8);
+  font-size: 22px;
+  animation: app-loading-pulse 1.4s ease-in-out infinite;
+}
+@keyframes app-loading-pulse {
+  0%, 100% { opacity: .55; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* Shared in-app dialogs. Native <dialog> supplies focus trapping and Escape
+   handling; this skin keeps messages readable and consistent with the editor. */
+.app-dialog {
+  width: min( min(560px, calc(100vw - 32px)), calc(100vh - 32px));
+  max-width: calc(100vw - 32px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 80px rgba(0,0,0,.42);
+}
+.app-dialog::backdrop { background: rgba(4, 7, 13, .68); backdrop-filter: blur(3px); }
+.app-dialog-card { display: grid; grid-template-columns: 42px 1fr; gap: 14px; padding: 24px; }
+.app-dialog-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: 18px; }
+.app-dialog-warning .app-dialog-icon { color: #d69b32; background: color-mix(in srgb, #d69b32 16%, transparent); }
+.app-dialog-danger .app-dialog-icon { color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
+.app-dialog-content { min-width: 0; }
+.app-dialog-content h2 { margin: 1px 0 8px; font-size: 17px; line-height: 1.25; }
+.app-dialog-message { margin: 0; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.app-dialog-input-label { display: grid; gap: 6px; margin-top: 16px; color: var(--muted); font-size: 12px; }
+.app-dialog-input { width: 100%; }
+.app-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+@media (max-width: 520px) { .app-dialog-card { grid-template-columns: 1fr; } .app-dialog-icon { display: none; } }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+body { display: flex; flex-direction: column; }
+
+button, select, input, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+button:hover { background: var(--button-hover); }
+/* Present is the one action people reach for constantly; give it weight so
+   the topbar reads as one primary action among secondary ones. */
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+button.primary:hover {
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  border-color: color-mix(in srgb, var(--accent) 85%, #000);
+}
+/* "Present" and "from here" read as one control with a dominant half. */
+.btn-split { display: inline-flex; }
+.btn-split button { border-radius: 0; }
+.btn-split button:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-split button:last-child {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+  border-left: 1px solid color-mix(in srgb, #000 22%, var(--accent));
+  font-weight: 400;
+  opacity: .92;
+}
+.btn-split button:last-child:hover { opacity: 1; }
+button.danger { border-color: #5a3030; color: #ffb3b3; }
+button.danger:hover { background: #432626; }
+body.light button.danger { border-color: #f4c4c4; color: #b91c1c; }
+body.light button.danger:hover { background: #fbe1e1; }
+
+.topbar-utility {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+#btn-settings {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Form controls use explicit app colors instead of browser defaults. This is
+   especially important in dark mode: number/url/search inputs otherwise keep
+   a light native surface while inheriting Revealation's light text color. */
+select,
+textarea,
+input:not([type]),
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="url"],
+input[type="search"],
+input[type="email"] {
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 5px 8px;
+}
+select option {
+  background: var(--panel);
+  color: var(--text);
+}
+input::placeholder, textarea::placeholder {
+  color: color-mix(in srgb, var(--muted) 86%, var(--text));
+  opacity: 1;
+}
+
+.media-caption-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.media-caption-control input {
+  width: min(260px, 28vw);
+  color: var(--text);
+}
+
+textarea { resize: vertical; }
+
+/* Top bar */
+.topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  gap: 10px 16px;
+  flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-name { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 4px 6px; font-weight: 700; font-size: 15px; letter-spacing: .2px; }
+.brand-name:hover { background: var(--button-hover); }
+.brand-name .bi { color: var(--accent); }
+.deck-title-label { max-width: 280px; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.field { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.field[hidden] { display: none; }
+.field.grow { flex: 1; }
+.field select, .field input, .field textarea { color: var(--text); }
+
+.status { font-size: 12px; color: var(--muted); min-width: 80px; }
+.status.saved { color: var(--ok); }
+
+
+/* Main toolbar ------------------------------------------------------------
+   Three explicit zones keep deck identity truly centered: brand on the left,
+   title/save state in the middle, and all commands on the right. */
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(44px, 1fr) auto minmax(44px, 1fr);
+  align-items: center;
+  flex-wrap: nowrap;
+  min-height: 54px;
+  padding: 8px 12px;
+  gap: 12px;
+}
+.topbar-left,
+.topbar-center,
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.topbar-left { justify-self: start; }
+.topbar-center { justify-self: center; max-width: min(440px, 38vw); }
+.topbar-right { justify-self: end; }
+.topbar-icon-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 7px;
+}
+.topbar-icon-button .bi { font-size: 16px; }
+.app-logo-button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+  overflow: hidden;
+}
+.app-logo-button img { width: 24px; height: 24px; display: block; object-fit: contain; }
+.app-logo-button:hover { background: var(--button-hover); }
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.deck-title-label {
+  display: block;
+  width: min(360px, 32vw);
+  min-width: 0;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  line-height: 34px;
+}
+.save-indicator {
+  width: 24px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--ok);
+  font-size: 14px;
+}
+.save-indicator[data-state="saving"] { color: var(--muted); }
+.save-indicator[data-state="saving"] .bi { animation: save-spin 1s linear infinite; }
+.save-indicator[data-state="error"] { color: var(--danger); }
+@keyframes save-spin { to { transform: rotate(360deg); } }
+.present-actions { margin-left: 4px; display: inline-flex; flex-wrap: nowrap; white-space: nowrap; }
+.present-actions button { min-height: 34px; height: 34px; white-space: nowrap; line-height: 1; }
+.present-actions button:first-child { padding-inline: 11px; }
+.present-actions button:last-child { padding-inline: 9px; }
+.present-actions .bi { font-size: 14px; }
+.present-actions .from-here-icon { display: none; }
+.app-status-toast {
+  position: fixed;
+  z-index: 500;
+  right: 16px;
+  bottom: 16px;
+  max-width: min(430px, calc(100vw - 32px));
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 8px 26px rgba(0,0,0,.28);
+  font-size: 12px;
+}
+.app-status-toast.ok { border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+.app-status-toast.error { border-color: color-mix(in srgb, var(--danger) 60%, var(--border)); color: var(--danger); }
+
+/* Layout */
+.layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+body.notes-open .layout {
+  grid-template-columns: 240px 1fr 380px;
+}
+
+/* Sidebar */
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sidebar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 13px;
+}
+.sidebar-head button {
+  padding: 2px 10px;
+  font-size: 18px;
+  line-height: 1;
+}
+.slide-list {
+  list-style: none;
+  padding: 8px;
+  margin: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.sidebar-foot {
+  flex: 0 0 auto;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 92%, var(--panel-2));
+}
+.deck-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 9px;
+}
+.deck-stats span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.deck-stats strong { font-size: 15px; line-height: 1.1; }
+.deck-stats small { margin-top: 2px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.sidebar-save-state { display: flex; align-items: center; min-height: 22px; }
+.sidebar-save-state .save-indicator {
+  width: auto;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  font-size: 12px;
+}
+.sidebar-save-state .save-indicator .bi { font-size: 13px; }
+.add-slide {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.add-slide .bi { font-size: 14px; }
+
+.slide-list li {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+.slide-list li.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-2));
+}
+.slide-list li.selected {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--border));
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel-2));
+}
+.slide-list li.selected.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 38%, transparent) inset;
+}
+.slide-list li.under-construction {
+  border-color: color-mix(in srgb, #f59e0b 62%, var(--border));
+  background: color-mix(in srgb, #f59e0b 10%, var(--panel-2));
+}
+.slide-list li.under-construction.active {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px #f59e0b inset;
+}
+.construction-badge {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #f59e0b;
+  color: #241300;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1.2;
+}
+.slide-list li.slide-hidden {
+  opacity: .7;
+}
+.slide-list li.slide-hidden.active,
+.slide-list li.slide-hidden.selected {
+  opacity: 1;
+}
+.hidden-slide-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted) 22%, var(--panel-2));
+  color: var(--muted);
+  font-size: 11px;
+}
+.slide-list li.drag-over {
+  border-top: 2px solid var(--accent);
+}
+.slide-list li.drag-over-after {
+  border-bottom: 2px solid var(--accent);
+}
+/* Drop-into cue: the target row is outlined as the parent-to-be, and an
+   indented bar under it shows where the new sub-slide will land. */
+.slide-list li.drag-over-nest {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.slide-list li.drag-over-nest::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 0;
+  bottom: -5px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.slide-list li.subslide,
+/* RV-COMPAT(subslide-vertical): REMOVE .vertical hook BEFORE PUBLIC RELEASE. */
+.slide-list li.vertical {
+  margin-left: 18px;
+}
+.slide-list li.subslide::before,
+.slide-list li.vertical::before {
+  content: "↳";
+  position: absolute;
+  left: -14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.slide-list .num {
+  color: var(--muted);
+  font-size: 11px;
+  min-width: 18px;
+}
+.slide-list .label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+/* Icon sizing in our buttons. The .bi base class sets font-family; we
+   control the visual size per location. */
+.toolbar button .bi {
+  font-size: 15px;
+  vertical-align: middle;
+}
+.toolbar button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+.toolbar button:disabled:hover { background: var(--panel-2); }
+/* Sidebar slide-list label icon */
+.slide-list .label .label-icon {
+  font-size: 13px;
+  margin-right: 4px;
+  vertical-align: -2px;
+  color: var(--muted);
+}
+
+/* Editor background badge icon */
+.slide-bg-badge .bi {
+  font-size: 12px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
+/* Sync pill icon */
+.sync-pill .sync-icon {
+  font-size: 13px;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+.sync-pill.is-syncing .sync-icon {
+  animation: sync-spin 1.1s linear infinite;
+}
+@keyframes sync-spin { to { transform: rotate(360deg); } }
+
+/* Topbar utility-cluster icon size matches the 32x32 button box. */
+#btn-settings .bi {
+  font-size: 15px;
+}
+
+/* Context menu (right-click on slides in the sidebar) */
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 200px;
+  padding: 4px 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+  font-size: 13px;
+}
+.context-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 6px 14px;
+  cursor: pointer;
+  color: var(--text);
+}
+.context-menu button:hover { background: var(--button-hover); }
+.context-menu button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.context-menu button:disabled:hover { background: transparent; }
+.context-menu button.danger { color: #d97777; }
+body.light .context-menu button.danger { color: #b91c1c; }
+.context-menu .sep {
+  display: block;
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* Editor */
+.editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+/* Clusters wrap as a unit, so a group never splits across two rows the way
+   loose buttons separated by <span class="sep"> used to. */
+.tb-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tb-group + .tb-group {
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}
+.toolbar button {
+  padding: 4px 8px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+/* Reveal.js-specific tools carry a word as well as a glyph — "fit text",
+   "stretch" and "fragment" have no icon convention to lean on. */
+.tb-label {
+  font-size: 11px;
+  letter-spacing: .2px;
+}
+/* Pressed-in state (e.g. source view toggled on) — theme-aware, unlike a
+   hardcoded background color. */
+.toolbar button.active,
+.toolbar button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--input-bg));
+  color: var(--text);
+}
+/* Split control: the main action and its caret share one outline. */
+.tb-split { gap: 0; }
+.tb-split button:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.tb-split button:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+.tb-caret .bi { font-size: 10px; }
+/* Caret goes accent-coloured when the caret sits inside a fragment, so the
+   menu shows that fragment's animation rather than the default. */
+.tb-caret.bound {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--input-bg));
+}
+.tb-style { min-width: 108px; }
+
+.tb-slide-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.tb-slide-actions button { min-width: 30px; }
+
+/* Toolbar popover menus (More, fragment animation) */
+.context-menu .menu-tick {
+  display: inline-block;
+  width: 14px;
+  margin-right: 6px;
+  font-size: 11px;
+  vertical-align: -1px;
+  color: var(--accent);
+}
+.context-menu .menu-hint {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+#toolbar-menu button { white-space: nowrap; }
+
+.toolbar-select {
+  padding: 0 6px;
+  font-size: 12px;
+  max-width: 140px;
+  height: 26px;
+  box-sizing: border-box;
+  transition: border-color .15s, background .15s;
+}
+.toolbar button {
+  height: 26px;
+  box-sizing: border-box;
+}
+
+.stage {
+  flex: 1;
+  overflow: hidden;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--stage-bg);
+  min-height: 0;
+}
+
+.slide-frame.reveal {
+  width: 960px;
+  height: 700px;
+  max-width: none;
+  aspect-ratio: auto;
+  background: var(--rv-bg, var(--r-background-color, #000));
+  color: var(--rv-text, var(--r-main-color, #fff));
+  font-family: var(--rv-font-body, var(--r-main-font, system-ui, sans-serif));
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.4);
+  position: relative;
+  overflow: hidden;
+}
+.slide-editor, .slide-source {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  outline: none;
+  overflow: hidden;
+}
+/* WYSIWYG geometry: reveal.js always lays a slide out at its configured
+   logical width/height and then scales the whole slide uniformly to fit the
+   viewport. We do the same here. --stage-scale is the rendered/editor width
+   divided by the logical reveal.js slide width. */
+.slide-editor {
+  /* CSS calc() cannot portably multiply a length by a number. updateStageScale()
+     resolves the logical theme tokens to concrete scaled px values instead. */
+  padding: var(--stage-slide-padding, var(--rv-slide-padding, 0px));
+  font-size: var(--stage-body-size, var(--rv-size-body, var(--r-main-font-size, 22px)));
+  line-height: var(--r-main-line-height, 1.3);
+  text-align: left;
+  overflow-wrap: break-word;
+}
+.slide-source {
+  padding: 18px 22px;
+  overflow: auto;
+}
+.slide-frame[data-content-overflow="1"] {
+  box-shadow: 0 0 0 3px #d84a4a, 0 6px 24px rgba(0,0,0,.4);
+}
+.slide-frame[data-content-overflow="1"]::after {
+  content: "Content overflows slide";
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 20;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #b3261e;
+  color: #fff;
+  font: 11px/1.25 system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.slide-bg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.slide-bg-layer iframe,
+.slide-bg-layer video {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #000;
+}
+/* Match reveal.js, which covers the slide with background video unless the
+   slide sets data-background-size="contain". The browser default for <video>
+   is contain, so cover has to be stated explicitly. */
+.slide-bg-layer video { object-fit: cover; }
+.slide-bg-layer[data-bg-size="contain"] video { object-fit: contain; }
+.rv-static-background-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.slide-bg-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, .72);
+  color: #fff;
+  font: 11px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slide-editor h1, .slide-editor h2, .slide-editor h3,
+.slide-editor h4, .slide-editor h5, .slide-editor h6 {
+  margin: 0 0 .4em;
+  font-family: var(--rv-font-heading, var(--r-heading-font, inherit));
+  color: var(--rv-text, var(--r-heading-color, inherit));
+  text-transform: var(--r-heading-text-transform, none);
+  font-weight: var(--r-heading-font-weight, 600);
+  letter-spacing: var(--r-heading-letter-spacing, normal);
+  line-height: var(--r-heading-line-height, 1.1);
+  text-shadow: var(--r-heading-text-shadow, none);
+}
+.slide-editor h1 { font-size: var(--rv-size-title, var(--r-heading1-size, 2.4em)); }
+.slide-editor h2 { font-size: var(--rv-size-heading, var(--r-heading2-size, 1.9em)); }
+.slide-editor h3 { font-size: var(--r-heading3-size, 1.5em); }
+.slide-editor h4 { font-size: var(--r-heading4-size, 1em); }
+.slide-editor p { margin: 0 0 var(--rv-block-spacing, var(--r-block-margin, .6em)); }
+.slide-editor a { color: var(--rv-accent, var(--r-link-color, inherit)); }
+.slide-editor pre {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: rgba(0,0,0,.55);
+  padding: 0;
+  border-radius: 6px;
+  font-size: var(--rv-size-code, .68em);
+  line-height: 1.32;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+.slide-editor code, .slide-editor pre code {
+  font-family: var(--rv-font-mono, var(--r-code-font, ui-monospace, Menlo, Consolas, monospace));
+}
+.slide-editor pre code,
+.slide-editor pre code.hljs {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: .65em .8em;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word;
+  overflow: hidden !important;
+  tab-size: 2;
+}
+.slide-editor img,
+.slide-editor video { max-width: 100%; max-height: 70vh; height: auto; }
+
+/* Selected-media controls. The selection box lives outside contenteditable so
+   it never leaks into deck HTML. Width is stored on the media itself as a
+   percentage of its current container (the slide or a column). */
+.media-toolbar {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 12px;
+}
+.media-toolbar[hidden] { display: none !important; }
+.media-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 650;
+  min-width: 64px;
+}
+.media-width-control { display: inline-flex; align-items: center; gap: 7px; }
+.media-width-control input[type="range"] { width: 150px; }
+.media-width-control output { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.media-reset-size { padding: 4px 8px; font-size: 11px; }
+.media-crop-control, .media-crop-ratio-control { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.media-crop-ratio-control select { height: 24px; font-size: 11px; }
+.video-settings { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.video-settings[hidden] { display: none !important; }
+.video-settings label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.media-hint { color: var(--muted); font-size: 11px; }
+.media-selection {
+  position: absolute;
+  z-index: 30;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.media-selection[hidden] { display: none !important; }
+.media-resize-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgba(0,0,0,.45);
+  pointer-events: auto;
+  cursor: move;
+  touch-action: none;
+}
+.media-resize-nw { left: -7px; top: -7px; cursor: nwse-resize; }
+.media-resize-n { left: calc(50% - 7px); top: -7px; cursor: ns-resize; }
+.media-resize-ne { right: -7px; top: -7px; cursor: nesw-resize; }
+.media-resize-e { right: -7px; top: calc(50% - 7px); cursor: ew-resize; }
+.media-resize-se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+.media-resize-s { left: calc(50% - 7px); bottom: -7px; cursor: ns-resize; }
+.media-resize-sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
+.media-resize-w { left: -7px; top: calc(50% - 7px); cursor: ew-resize; }
+.sr-media-crop { display: block; position: relative; overflow: hidden; max-width: 100%; box-sizing: border-box; line-height: 0; }
+.sr-media-crop > img { position: absolute; display: block; max-width: none; max-height: none; width: var(--sr-crop-image-width, 100%); height: var(--sr-crop-image-height, 100%); left: var(--sr-crop-image-left, 0%); top: var(--sr-crop-image-top, 0%); }
+.sr-media-crop:not([data-crop-ratio]) > img { position: relative; width: 100%; height: auto; max-width: 100%; }
+.slide-editor img, .slide-editor video { cursor: default; }
+.slide-editor a.linked-image img { cursor: pointer; }
+
+
+/* Revealation structured content: layouts, math and code blocks. */
+/* Default slide content is left-aligned. Centering is an explicit block so
+   bullet-heavy teaching slides remain readable while titles/callouts can still
+   opt in to centered composition. */
+/* RV-COMPAT(align-shorthand): REMOVE .sr-center BEFORE PUBLIC RELEASE. */
+.slide-editor .sr-center,
+.slide-editor .sr-align-center {
+  text-align: center;
+  width: 100%;
+}
+.slide-editor .sr-align-right { text-align: right; }
+.slide-editor .sr-align-left { text-align: left; }
+
+/* RV-COMPAT(columns-directive): REMOVE old columns selectors BEFORE PUBLIC RELEASE. */
+.slide-editor .sr-columns {
+  display: grid;
+  gap: 1.25em;
+  align-items: start;
+  width: 100%;
+  margin: .35em 0 .7em;
+}
+.slide-editor .sr-cols-50-50 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.slide-editor .sr-cols-60-40 { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.slide-editor .sr-cols-40-60 { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.slide-editor .sr-col {
+  min-width: 0;
+  min-height: 3em;
+  /* Editor affordance only. Outline does not consume layout space, so the
+     column width matches the exported reveal.js slide exactly. */
+  outline: 1px dashed color-mix(in srgb, currentColor 25%, transparent);
+  outline-offset: -1px;
+  border-radius: 5px;
+}
+.slide-editor .sr-col:focus-within { outline-color: var(--accent); }
+.slide-editor pre.sr-code {
+  position: relative;
+  cursor: pointer;
+  text-align: left;
+}
+.slide-editor pre.sr-code::after,
+.slide-editor .sr-math::after {
+  position: absolute;
+  right: 5px;
+  top: 4px;
+  content: "double-click to edit";
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font: 9px/1.2 system-ui, sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s;
+}
+.slide-editor pre.sr-code:hover::after,
+.slide-editor .sr-math:hover::after { opacity: .75; }
+.slide-editor .sr-math {
+  position: relative;
+  cursor: pointer;
+  border-radius: 4px;
+  outline: 1px solid transparent;
+}
+.slide-editor .sr-math:hover { outline-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.slide-editor .sr-math[data-display="1"] { display: block; margin: .55em 0; text-align: center; }
+.slide-editor audio { width: min(100%, 520px); }
+
+/* Editor-only marker for click-to-open linked images. Doesn't follow into the
+   exported deck or preview — there the link itself is the affordance. */
+.slide-editor a.linked-image {
+  position: relative;
+  display: inline-block;
+}
+.slide-editor a.linked-image::after {
+  content: "↗ " attr(href);
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  max-width: calc(100% - 12px);
+  background: rgba(0, 0, 0, .65);
+  color: #fff;
+  font: 11px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  padding: 2px 6px;
+  border-radius: 3px;
+  pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slide-editor blockquote {
+  border-left: 3px solid currentColor;
+  padding-left: 12px;
+  margin: 0 0 var(--rv-block-spacing, var(--r-block-margin, .6em));
+  opacity: .85;
+}
+.slide-editor .fragment {
+  outline: 1px dashed rgba(79, 140, 255, .55);
+  outline-offset: 2px;
+  position: relative;
+}
+.slide-editor .fragment::after {
+  content: attr(data-fragment-label);
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  pointer-events: none;
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+  opacity: .85;
+}
+.slide-editor .r-fit-text {
+  display: block;
+  line-height: 1;
+  white-space: nowrap;
+  margin: 0;
+  outline: 1px dotted rgba(76, 175, 118, .5);
+  outline-offset: 4px;
+}
+.slide-editor .r-stretch {
+  display: block;
+  width: 100%;
+  object-fit: contain;
+  outline: 1px dotted rgba(76, 175, 118, .5);
+  outline-offset: 4px;
+}
+.slide-source {
+  background: #0c0d10;
+  color: #d8dee9;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+  border: none;
+}
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(79, 140, 255, .18);
+  border: 3px dashed var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+
+/* Deck markdown mode — replaces the toolbar, stage and meta strip. */
+body.markdown-mode .toolbar,
+body.markdown-mode .stage { display: none; }
+
+.markdown-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.markdown-pane[hidden] { display: none; }
+.markdown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-wrap: wrap;
+}
+.markdown-about { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.markdown-hint { color: var(--muted); font-size: 12px; }
+.markdown-hint code {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+.markdown-actions { display: flex; align-items: center; gap: 8px; }
+.markdown-status { font-size: 12px; color: var(--muted); min-width: 120px; text-align: right; }
+.markdown-status.bad { color: var(--danger, #d97777); }
+.markdown-editor-shell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--input-bg);
+}
+.markdown-highlight,
+#markdown-text {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 16px 18px;
+  box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 400;
+  font-style: normal;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  word-spacing: 0;
+  line-height: 1.6;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+.markdown-highlight {
+  z-index: 1;
+  pointer-events: none;
+  color: var(--text);
+  background: var(--input-bg);
+  scrollbar-width: none;
+}
+.markdown-highlight::-webkit-scrollbar { display: none; }
+#markdown-text {
+  z-index: 2;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  -webkit-text-fill-color: transparent;
+}
+#markdown-text::selection {
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+#markdown-text:focus { outline: none; }
+/*
+ * The highlight layer must be metrically identical to the textarea below it.
+ * Any border, padding, letter-spacing, bold/italic font, or different line box
+ * here makes the visible text drift away from the real caret. Keep syntax
+ * highlighting paint-only: color/background/box-shadow/text-decoration.
+ */
+.markdown-highlight .md-line {
+  /* Inline spans + literal newlines deliberately mirror the textarea's own
+     line layout. Never make syntax tokens block boxes: sub-pixel line-height
+     rounding then accumulates and the visible text drifts away from the caret. */
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  word-spacing: inherit;
+}
+.markdown-highlight .md-heading { color: var(--accent); }
+.markdown-highlight .md-directive { color: #a78bfa; }
+.markdown-highlight .md-media { color: #22c55e; }
+.markdown-highlight .md-code,
+.markdown-highlight .md-fence { color: #f59e0b; }
+.markdown-highlight .md-math { color: #38bdf8; }
+.markdown-highlight .md-note { color: var(--muted); }
+.markdown-highlight .md-comment { color: var(--muted); }
+.markdown-highlight .md-slide-separator,
+.markdown-highlight .md-vertical-separator {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  box-shadow:
+    inset 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+    inset 0 -1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.markdown-highlight .md-vertical-separator {
+  color: #a78bfa;
+  background: color-mix(in srgb, #a78bfa 11%, transparent);
+  box-shadow:
+    inset 0 1px color-mix(in srgb, #a78bfa 35%, transparent),
+    inset 0 -1px color-mix(in srgb, #a78bfa 35%, transparent);
+}
+body.markdown-mode #btn-add-slide { display: none; }
+body.markdown-mode .slide-list li { cursor: pointer; }
+body.markdown-mode .slide-list li .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.markdown-mode .slide-list li.md-current {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+
+/* Topbar buttons that pair an icon with a word. */
+button.has-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+button.has-icon.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--input-bg));
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+#present-frame {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #000;
+}
+
+/* Present is a real presentation surface, not a dialog with editor chrome.
+   The iframe occupies the complete viewport; Escape or Ctrl/Cmd+P returns to
+   the editor, and Reveal's own fullscreen/overview controls remain available. */
+.present-modal {
+  background: #000;
+}
+
+
+/* Compact insert dialogs. */
+.tool-modal {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0,0,0,.62);
+}
+.tool-card {
+  width: min(760px, 96vw);
+  max-height: min(780px, 92vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 20px 70px rgba(0,0,0,.45);
+  background: var(--panel);
+  color: var(--text);
+}
+.tool-card .modal-head { border-radius: 10px 10px 0 0; }
+.tool-body {
+  padding: 16px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tool-textarea {
+  width: 100%;
+  min-height: 240px;
+  resize: vertical;
+  font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.math-textarea { min-height: 110px; }
+.tool-hint { margin: 0; color: var(--muted); font-size: 12px; }
+.tool-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.math-preview {
+  min-height: 62px;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  text-align: center;
+}
+.math-preview.bad { color: var(--danger, #d97777); text-align: left; white-space: pre-wrap; }
+.layout-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.layout-choices > button {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  align-items: stretch;
+  background: var(--input-bg);
+}
+.layout-thumb { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; height: 84px; }
+.layout-thumb.layout-60-40 { grid-template-columns: 3fr 2fr; }
+.layout-thumb.layout-40-60 { grid-template-columns: 2fr 3fr; }
+.layout-thumb i { display: block; border-radius: 4px; background: color-mix(in srgb, var(--accent) 35%, var(--panel)); border: 1px solid var(--border); }
+.assets-tool-card { width: min(940px, 97vw); }
+.assets-body { min-height: 300px; }
+.assets-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.assets-search {
+  display: inline-flex; align-items: center; gap: 7px; min-width: min(260px, 100%);
+  padding: 5px 9px; border: 1px solid var(--border); border-radius: 5px;
+  background: var(--input-bg); color: var(--muted);
+}
+.assets-search input { width: 190px; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; color: var(--text); }
+.assets-search:focus-within { border-color: var(--accent); }
+.button-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--input-bg);
+  cursor: pointer;
+  font-size: 13px;
+}
+.button-like:hover { background: var(--button-hover); }
+.assets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.asset-card { border: 1px solid var(--border); border-radius: 7px; overflow: hidden; background: var(--input-bg); }
+.asset-card:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+.asset-preview { height: 110px; display: grid; place-items: center; background: rgba(0,0,0,.16); overflow: hidden; }
+.asset-preview { cursor: pointer; }
+.asset-preview:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.asset-preview img, .asset-preview video { width: 100%; height: 100%; object-fit: contain; }
+.asset-preview audio { width: calc(100% - 16px); }
+.asset-info { padding: 8px; display: grid; gap: 7px; }
+.asset-name { font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.asset-actions { display: flex; gap: 6px; }
+.asset-actions button { flex: 1; padding: 4px 6px; font-size: 11px; }
+.assets-empty { margin: auto; max-width: 540px; text-align: center; color: var(--muted); }
+@media (max-width: 720px) {
+  .layout-choices { grid-template-columns: 1fr; }
+  .tool-modal { padding: 8px; }
+}
+
+.notes-panel {
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.notes-panel[hidden] { display: none; }
+.notes-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.notes-panel-head > div { display: grid; gap: 2px; min-width: 0; }
+.notes-panel-head strong { font-size: 13px; }
+.notes-panel-slide { color: var(--muted); font-size: 11px; }
+.notes-panel-head button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+.notes-panel-options {
+  display: grid;
+  border-bottom: 1px solid var(--border);
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 14px;
+  cursor: pointer;
+}
+.toggle-row + .toggle-row { border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.toggle-row > span { display: grid; gap: 2px; min-width: 0; }
+.toggle-row strong { font-size: 12px; font-weight: 600; }
+.toggle-row small { color: var(--muted); font-size: 10px; line-height: 1.3; }
+.toggle-row input[type=checkbox] {
+  width: 34px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+.notes-panel-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.notes-panel-editor > span {
+  padding: 12px 14px 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+#notes-panel-text {
+  flex: 1;
+  min-height: 140px;
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  resize: none;
+  padding: 8px 14px 16px;
+  font: 14px/1.55 ui-monospace, Menlo, Consolas, monospace;
+  background: var(--panel);
+  color: var(--text);
+  outline: none;
+}
+#notes-panel-text:focus { box-shadow: inset 2px 0 0 var(--accent); }
+
+/* Projects modal */
+.projects-modal { background: rgba(0,0,0,.55); }
+.projects-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  background: var(--panel);
+  color: var(--text);
+  min-height: 0;
+}
+.projects-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.projects-toolbar .projects-import {
+  display: inline-flex;
+  align-items: center;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.projects-toolbar .projects-import:hover { background: var(--button-hover); }
+.projects-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.projects-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  align-items: center;
+}
+.projects-list li.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.projects-list .proj-name {
+  font-weight: 600;
+  font-size: 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 4px;
+  min-width: 0;
+  width: 100%;
+}
+.projects-list .proj-name:hover { border-color: var(--border); background: var(--input-bg); }
+.projects-list .proj-name:focus { border-color: var(--accent); background: var(--input-bg); outline: none; }
+.projects-list .proj-meta {
+  grid-column: 1;
+  font-size: 11px;
+  color: var(--muted);
+}
+.projects-list .proj-actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.projects-list .proj-actions button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.projects-list .proj-actions button.danger { color: #d97777; border-color: transparent; }
+.projects-list .proj-actions button.danger:hover { background: #5a2828; }
+body.light .projects-list .proj-actions button.danger { color: #b91c1c; }
+body.light .projects-list .proj-actions button.danger:hover { background: #fbe1e1; }
+.projects-remote {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.projects-remote-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.projects-remote-head strong {
+  font-size: 13px;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.projects-remote-head button {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.projects-remote-status {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.projects-list .proj-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-left: 6px;
+}
+.projects-list .proj-tag.match { background: rgba(76, 175, 118, .18); color: #6fcc91; border: 1px solid color-mix(in srgb, var(--ok) 50%, transparent); }
+.projects-list .proj-tag.orphan { background: rgba(194, 90, 90, .18); color: #ffb3b3; border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent); }
+.projects-list .proj-tag.duplicate { background: rgba(255, 180, 60, .18); color: #ffc36f; border: 1px solid #c89a3a; }
+body.light .projects-list .proj-tag.match { color: #047857; }
+body.light .projects-list .proj-tag.orphan { color: #b91c1c; }
+body.light .projects-list .proj-tag.duplicate { color: #b27418; }
+.projects-list .proj-id {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.projects-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Sync pill in topbar */
+.sync-pill {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sync-pill:hover { background: var(--button-hover); color: var(--text); }
+.sync-pill.is-syncing { color: var(--accent); border-color: var(--accent); }
+.sync-pill.is-error { color: var(--danger); border-color: var(--danger); }
+.sync-pill.is-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
+
+/* Sync modal */
+.sync-modal {
+  background: rgba(0, 0, 0, .55);
+  align-items: center;
+  justify-content: center;
+}
+.sync-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: min(540px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+  overflow: hidden;
+}
+.sync-card .modal-head { border-radius: 8px 8px 0 0; }
+.sync-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.sync-body p { margin: 0 0 10px; }
+.sync-body a { color: var(--accent); }
+.sync-steps { padding-left: 20px; margin: 8px 0 14px; }
+.sync-steps li { margin-bottom: 6px; }
+.sync-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.sync-field span { color: var(--muted); font-size: 12px; }
+.sync-field em { font-style: normal; color: var(--muted); }
+.sync-field input { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.sync-status-line { margin: 4px 0; }
+.sync-status-line code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.sync-mini-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+.sync-error {
+  color: #ffb3b3;
+  background: rgba(194, 90, 90, .15);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+body.light .sync-error { color: #b91c1c; }
+
+/* Settings modal */
+.settings-modal {
+  background: rgba(0, 0, 0, .55);
+  align-items: center;
+  justify-content: center;
+}
+.settings-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: min(620px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+  overflow: hidden;
+}
+.settings-card .modal-head { border-radius: 8px 8px 0 0; }
+.settings-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.settings-intro {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.settings-intro a { color: var(--accent); }
+.settings-form { display: flex; flex-direction: column; gap: 4px; }
+.settings-form h4 {
+  margin: 12px 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.settings-form h4:first-child { margin-top: 0; }
+.presentation-settings-form { margin-top: 14px; }
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+}
+.settings-row label {
+  font-size: 13px;
+  color: var(--text);
+}
+.settings-row .help {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.settings-row input[type=number],
+.settings-row select {
+  min-width: 140px;
+}
+.settings-row input[type=checkbox] { justify-self: end; }
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* Curated presentation theme picker. Theme authors own visual styling;
+   the normal UI deliberately exposes no font/color/spacing controls. */
+.theme-picker-button {
+  min-width: 118px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  justify-content: space-between;
+}
+.theme-picker-swatch {
+  width: 20px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--input-bg) center/cover no-repeat;
+}
+.theme-modal {
+  background: rgba(0,0,0,.62);
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.theme-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: min(920px, calc(100% - 24px));
+  max-height: min(760px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, .45);
+  overflow: hidden;
+}
+.theme-picker-help {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.style-dialog-body {
+  padding: 18px 20px 22px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.style-section + .style-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.style-section > h4 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.style-dialog-body .theme-choices {
+  padding: 0;
+  overflow: visible;
+}
+.style-settings-form {
+  max-width: 620px;
+}
+.ui-theme-choice {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--input-bg);
+}
+.ui-theme-choice button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: transparent;
+  background: transparent;
+}
+.ui-theme-choice button.selected,
+.ui-theme-choice button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 15%, var(--panel));
+}
+.app-settings-card { width: min(520px, calc(100% - 32px)); }
+.theme-choices {
+  padding: 18px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.theme-choice {
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.theme-choice:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.theme-choice.selected,
+.theme-choice[aria-selected="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.theme-choice-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--stage-bg) center/cover no-repeat;
+  border-bottom: 1px solid var(--border);
+}
+.theme-choice-copy { display: block; padding: 10px 12px 12px; }
+.theme-choice-name { display: block; font-weight: 700; }
+.theme-choice-description { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+
+.background-tool-card { width: min(680px, calc(100% - 32px)); }
+.background-choices {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.background-choice {
+  width: 86px;
+  padding: 4px;
+  display: grid;
+  gap: 4px;
+  text-align: center;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 10px;
+}
+.background-choice:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.background-choice.selected,
+.background-choice[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.background-choice-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 3px;
+  background: var(--stage-bg) center/cover no-repeat;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+}
+.background-choice-preview.background-choice-none {
+  background:
+    linear-gradient(135deg, transparent 47%, color-mix(in srgb, var(--muted) 55%, transparent) 48% 52%, transparent 53%),
+    var(--panel);
+}
+/* RV-COMPAT(background-reveal): REMOVE legacy notice BEFORE PUBLIC RELEASE. */
+.background-legacy-notice {
+  max-width: 340px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* About modal */
+.about-modal {
+  background: rgba(0,0,0,.55);
+  align-items: center;
+  justify-content: center;
+}
+.about-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+}
+.about-card .modal-head { border-radius: 8px 8px 0 0; }
+.about-body {
+  padding: 16px 18px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.about-body p { margin: 0 0 10px; }
+.about-body p:last-child { margin-bottom: 0; }
+.about-body a { color: var(--accent); }
+.about-logo { width: 100%; max-width: 300px; display: grid; place-items: center; margin: 0 auto 16px; padding: 8px 0; }
+.about-logo img { width: 100%; height: auto; max-height: 88px; display: block; object-fit: contain; }
+.about-body h3 { margin: 0 0 2px; font-size: 18px; }
+.about-tagline { color: var(--muted); }
+.about-details { display: grid; grid-template-columns: max-content 1fr; gap: 7px 14px; margin: 18px 0 0; font-size: 12px; }
+.about-details dt { color: var(--muted); }
+.about-details dd { margin: 0; overflow-wrap: anywhere; }
+.about-details a { color: var(--accent); }
+
+
+/* Deck settings / export / help ----------------------------------------- */
+.deck-settings-card { width: min(920px, calc(100% - 24px)); }
+.deck-metadata-form { max-width: 620px; }
+.deck-metadata-form input[type="text"] { min-width: min(300px, 42vw); }
+.deck-metadata-readonly span { color: var(--muted); font-size: 12px; }
+.export-card, .help-card { width: min(720px, calc(100% - 32px)); }
+.export-options { display: grid; gap: 8px; }
+.export-option {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.export-option:last-child { border-bottom: 0; }
+.export-option strong { display: block; margin-bottom: 2px; }
+.export-option p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.export-option button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.export-option-actions { display: inline-flex; align-items: center; gap: 6px; }
+.export-icon-button { width: 42px; height: 42px; justify-content: center; padding: 0; font-size: 19px; }
+.export-icon-button .bi { line-height: 1; }
+.export-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.export-settings label { display: inline-flex; align-items: center; gap: 5px; }
+.export-settings small { flex-basis: 100%; color: var(--muted); }
+.export-warning {
+  margin-top: 7px !important;
+  color: color-mix(in srgb, #d99b35 82%, var(--text)) !important;
+  max-width: 520px;
+}
+.help-section + .help-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.help-section h4 { margin: 0 0 8px; font-size: 13px; }
+.help-section > p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.shortcut-list {
+  display: grid;
+  grid-template-columns: minmax(180px, max-content) 1fr;
+  gap: 7px 16px;
+  margin: 0;
+  font-size: 12px;
+}
+.shortcut-list dt, .shortcut-list dd { margin: 0; }
+.shortcut-list dd { color: var(--muted); }
+kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.help-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+.help-actions button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ==========================================================================
+   Small screens
+   ==========================================================================
+   The desktop shell shows everything at once: a slide list, a full topbar, a
+   formatting toolbar and side panels. On a phone the slide takes the stage: the
+   slide list becomes a left drawer, notes become a full editor-side overlay,
+   and the rest of the topbar collapses into one "⋯" menu. Nothing is duplicated — the mobile controls drive the same elements
+   and handlers the desktop chrome does.
+
+   These four are mobile-only, so they start hidden and the media query below
+   turns them on. */
+#btn-mobile-menu,
+.sidebar-close,
+.mobile-slidebar,
+.mobile-scrim,
+.slide-list .row-menu { display: none; }
+
+/* Phones, plus phone-sized landscape windows where the vertical space is the
+   binding constraint. Kept in sync with MOBILE_QUERY in app.js. */
+@media (max-width: 760px), (max-height: 500px) and (max-width: 950px) {
+  /* --viewport-height is the visual viewport, set by syncViewportHeight() in
+     app.js: when the on-screen keyboard opens it is the only measure that
+     shrinks, so without it the bottom strip and the toolbar are pushed under
+     the keyboard exactly when they're wanted. It falls back to 100dvh, which
+     tracks the browser's collapsing URL bar the way svh/lvh do not. */
+  html, body { height: var(--viewport-height, 100dvh); }
+
+  /* iOS Safari zooms the whole page when a control smaller than 16px takes
+     focus, which leaves the editor scrolled sideways. */
+  select,
+  input[type=text],
+  input[type=password],
+  input[type=number],
+  textarea { font-size: 16px; }
+
+  /* ---- Topbar: identity + primary Present + overflow ---- */
+  .topbar {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    padding: 6px 8px;
+    padding-top: max(6px, env(safe-area-inset-top));
+    gap: 5px;
+  }
+  .topbar-left { justify-self: start; gap: 3px; min-width: 0; }
+  .topbar-center { justify-self: stretch; justify-content: center; max-width: none; gap: 2px; overflow: hidden; }
+  .topbar-right { justify-self: end; gap: 4px; }
+  .app-logo-button { width: 32px; height: 36px; }
+  .deck-title-label {
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0 4px;
+    line-height: 36px;
+  }
+  #save-indicator { width: 20px; }
+  #btn-deck-settings,
+  #btn-export,
+  #btn-undo,
+  #btn-redo,
+  #btn-settings,
+  #btn-help { display: none; }
+  .present-actions { margin-left: 0; flex: 0 0 auto; }
+  .present-actions button { height: 38px; min-height: 38px; }
+  #btn-preview {
+    width: auto;
+    padding: 0 10px;
+    justify-content: center;
+  }
+  #btn-preview-here { display: inline-flex; padding: 0 9px; }
+  #btn-mobile-menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+  }
+  #btn-mobile-menu .bi { font-size: 18px; }
+
+  /* Keep the split Present control useful on very narrow phones without
+     allowing either half to change height or wrap its label. */
+  @media (max-width: 760px) {
+    #btn-preview,
+    #btn-preview-here {
+      width: 38px;
+      padding: 0;
+      justify-content: center;
+      gap: 0;
+    }
+    #btn-preview span,
+    #btn-preview-here span { display: none; }
+    #btn-preview .bi { font-size: 20px; }
+    #btn-preview-here .from-here-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      line-height: 1;
+    }
+  }
+
+  /* ---- Slide list as a left drawer ----
+     The drawer, the sheet, the notes panel and the backdrop are all anchored
+     to .layout rather than the viewport. Fixed positioning is measured
+     against the layout viewport, which the on-screen keyboard does not
+     shrink — a bottom-anchored sheet would sit behind the keyboard. .layout
+     does shrink, because --viewport-height shortens the shell. */
+  .layout,
+  body.notes-open .layout { grid-template-columns: 1fr; }
+  .layout { position: relative; }
+
+  .sidebar {
+    position: absolute;
+    z-index: 90;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(320px, 86vw);
+    padding-bottom: env(safe-area-inset-bottom);
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+    box-shadow: 10px 0 34px rgba(0, 0, 0, .45);
+  }
+  body.slides-open .sidebar { transform: none; }
+
+  .sidebar-head { gap: 8px; padding: 12px; }
+  .sidebar-head > span { flex: 1; font-size: 15px; }
+  .sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+  }
+  .add-slide { width: 34px; height: 34px; }
+  .add-slide .bi { font-size: 16px; }
+
+  .slide-list { padding: 8px 10px; }
+  .slide-list li { padding: 11px 10px; }
+  .slide-list .label { font-size: 14px; }
+  /* A 16px "×" next to a full-width tap target is an accidental deletion
+     waiting to happen; Delete lives in the row menu instead, and reordering
+     lives there too since dragging rows is a mouse gesture. */
+  .slide-list .row-menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin: -6px -4px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .sidebar-foot { padding: 10px 12px; }
+  .sidebar-foot button { font-size: 14px; padding: 6px 8px; }
+
+  .mobile-scrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 80;
+    background: rgba(0, 0, 0, .5);
+  }
+
+  /* ---- Toolbar: one scrolling row of icon-only buttons ----
+     It stays above the stage rather than under it: pinned to the bottom it
+     would sit behind the on-screen keyboard exactly when it's wanted. */
+  .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    gap: 0 6px;
+    padding: 6px 8px;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .tb-group { flex: 0 0 auto; }
+  .tb-slide-actions { margin-left: 0; }
+  .toolbar button {
+    height: 38px;
+    min-width: 38px;
+    padding: 0 7px;
+    justify-content: center;
+  }
+  .toolbar button .bi { font-size: 17px; }
+  .tb-label { display: none; }
+  .toolbar-select,
+  .tb-style {
+    height: 38px;
+    min-width: 96px;
+    max-width: 116px;
+  }
+  .tb-split button:last-child { min-width: 26px; padding: 0 4px; }
+  /* Whole groups, not single buttons — hiding a lone button would leave the
+     group's divider behind as a stray sliver. Both reappear in "More". */
+  .tb-group[aria-label="Reveal.js sizing"],
+  .tb-group[aria-label="View"] { display: none; }
+
+  /* ---- Stage: the slide, as large as the width allows ---- */
+  .stage { padding: 10px; }
+  .slide-frame {
+    /* Auto margins rather than align-items: center. Both centre the frame in
+       the spare height, but a centred flex item in a scroll container has its
+       overflowing top cut off and unreachable — which is what happens the
+       moment the keyboard shortens the stage. */
+    margin-block: auto;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .4);
+  }
+  /* Same reveal.js geometry on small screens: the whole logical slide is
+     uniformly scaled, so line breaks do not change just because the editor is
+     narrower. */
+  .slide-source { padding: 12px; }
+  .slide-editor {
+    padding: var(--stage-slide-padding, var(--rv-slide-padding, 0px));
+    font-size: var(--stage-body-size, var(--rv-size-body, var(--r-main-font-size, 22px)));
+  }
+  /* Raw HTML is chrome, not slide content, so it doesn't scale with the
+     frame — and 16px keeps iOS from zooming when it takes focus. */
+  .slide-source { font-size: 16px; }
+  /* 70vh is taller than the whole frame here. */
+  .slide-editor img,
+  .slide-editor video { max-height: 100%; }
+
+  /* ---- Slide navigation strip ---- */
+  .mobile-slidebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 6px 8px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .mobile-slidebar button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 10px;
+  }
+  .mobile-slidebar button .bi { font-size: 17px; }
+  .mobile-slidebar button:disabled { opacity: .35; }
+  .mobile-slidebar button:disabled:hover { background: var(--panel-2); }
+  .mobile-slidebar .m-picker {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* ---- Overlays that assumed a desktop-sized window ---- */
+  .notes-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 96;
+    border-left: none;
+  }
+  .context-menu {
+    max-width: calc(100vw - 16px);
+    max-height: 70dvh;
+    overflow-y: auto;
+    font-size: 15px;
+  }
+  .context-menu button { padding: 10px 14px; }
+  .theme-card {
+    width: 100%;
+    border-left: none;
+  }
+  .settings-card,
+  .sync-card,
+  .about-card {
+    width: calc(100% - 16px);
+    max-height: calc(100% - 16px);
+  }
+  .settings-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 4px;
+  }
+  .settings-row input[type=checkbox] { justify-self: start; }
+  .settings-row input[type=number],
+  .settings-row select { width: 100%; }
+  .color-pair { width: 100%; }
+  .color-pair input[type=text] { width: 100%; min-width: 0; }
+  .projects-body { padding: 12px; }
+  /* Name, dates and four actions don't fit on one line; let the actions take
+     a row of their own under the name. */
+  .projects-list li { grid-template-columns: 1fr; }
+  .projects-list .proj-actions {
+    grid-column: 1;
+    grid-row: auto;
+    flex-wrap: wrap;
+  }
+  .projects-list .proj-actions button { padding: 7px 10px; }
+  /* Markdown mode replaces the slide editor; the mobile slide strip navigates
+     something that is not on screen. */
+  body.markdown-mode .mobile-slidebar { display: none; }
+
+  .markdown-head { gap: 8px; padding: 8px 10px; }
+  .markdown-hint { display: none; }
+  .markdown-status { min-width: 0; }
+  #markdown-text { font-size: 16px; padding: 12px; }
+}
+
+/* Workspace mode additions */
+.asset-card .asset-path { font-size: .74rem; opacity: .66; word-break: break-all; margin-top: .15rem; }
+body.workspace-mode #btn-projects, body.workspace-mode #btn-new, body.workspace-mode #btn-sync { display: none !important; }
+
+
+@media (max-width: 720px) {
+  .media-toolbar { gap: 7px; padding: 5px 8px; }
+  .media-width-control { flex: 1 1 190px; }
+  .media-width-control input[type="range"] { flex: 1; min-width: 90px; }
+  .video-settings { flex-basis: 100%; }
+  .media-hint { flex-basis: 100%; }
+}
+
+
+/* 3.3: Markdown reliability mode. The textarea renders its own visible text.
+   This removes the impossible-to-perfectly-match PRE overlay and therefore
+   eliminates caret/text drift at any zoom level or document length. */
+.markdown-highlight { display: none !important; }
+#markdown-text {
+  background: var(--input-bg);
+  color: var(--text);
+  -webkit-text-fill-color: currentColor;
+}
+#markdown-text::selection {
+  color: var(--text);
+  -webkit-text-fill-color: currentColor;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.markdown-editor-shell.has-errors {
+  box-shadow: inset 3px 0 #ef4444;
+}
+.markdown-editor-shell.has-errors #markdown-text {
+  background: color-mix(in srgb, #ef4444 5%, var(--input-bg));
+}
+
+/* PWA deployment ---------------------------------------------------------- */
+.pwa-update-banner {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, calc(100% - 32px));
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  box-shadow: 0 10px 28px rgba(0,0,0,.28);
+  font-size: 12px;
+}
+.pwa-update-banner span { flex: 1; min-width: 0; }
+.pwa-update-banner button { white-space: nowrap; }
+
+.workspace-picker-card { width: min(640px, calc(100% - 32px)); }
+.workspace-picker-message { margin: 0 0 8px; line-height: 1.5; }
+.workspace-picker-recent-section { margin-top: 18px; }
+.workspace-picker-section-title { margin-bottom: 8px; font-size: 12px; font-weight: 650; opacity: .72; }
+.workspace-picker-recent { display: grid; gap: 8px; }
+.workspace-recent-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 88%, var(--input-bg));
+  color: inherit;
+  cursor: pointer;
+}
+.workspace-recent-row:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--panel)); }
+.workspace-recent-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.workspace-recent-main { min-width: 0; }
+.workspace-recent-eyebrow { margin-bottom: 2px; color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.workspace-recent-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.workspace-recent-meta { margin-top: 2px; font-size: 11px; opacity: .65; }
+.workspace-picker-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.workspace-picker-actions .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.workspace-open-button { gap: 6px; padding-inline: 9px; }
+body.directory-workspace-mode #btn-workspace-folder { display: inline-flex !important; }

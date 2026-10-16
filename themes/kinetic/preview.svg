@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180">
+  <rect width="320" height="180" fill="#fff8f3"/>
+  <text x="28" y="47" fill="#27213a" font-family="Trebuchet MS,Arial,sans-serif" font-size="22" font-weight="700">Kinetic</text>
+  <rect x="29" y="57" width="66" height="5" rx="3" fill="#6b4eff"/>
+  <rect x="95" y="57" width="34" height="5" rx="3" fill="#ff5c7a"/>
+  <rect x="29" y="78" width="245" height="6" rx="3" fill="#736b86" opacity=".68"/>
+  <rect x="29" y="91" width="203" height="6" rx="3" fill="#736b86" opacity=".48"/>
+  <rect x="29" y="116" width="246" height="38" rx="12" fill="#ffe9dc" stroke="#ffc94a"/>
+  <rect x="42" y="128" width="132" height="6" rx="3" fill="#ff5c7a"/>
+  <rect x="42" y="140" width="188" height="5" rx="2.5" fill="#6b4eff" opacity=".55"/>
+  <circle cx="281" cy="32" r="14" fill="#00a79d" opacity=".75"/>
+</svg>

@@ -1,0 +1,10 @@
+{
+  "id": "grid",
+  "name": "Grid",
+  "version": "1.0",
+  "description": "A subtle token-aware technical grid.",
+  "css": "background.css",
+  "js": "grid.js",
+  "previewJs": "preview.js",
+  "preview": "preview.svg"
+}

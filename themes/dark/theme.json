@@ -1,0 +1,11 @@
+{
+  "id": "dark",
+  "name": "Dark",
+  "version": "1.0",
+  "description": "A restrained dark theme with high contrast and cool accents.",
+  "css": "theme.css",
+  "preview": "preview.svg",
+  "backgrounds": {
+    "recommended": ["grid"]
+  }
+}

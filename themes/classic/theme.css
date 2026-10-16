@@ -1,0 +1,136 @@
+/* Revealation theme: Classic. Warm editorial serif typography. */
+:root {
+  --rv-bg: #f5f0e5;
+  --rv-text: #2b2925;
+  --rv-muted: #776f63;
+  --rv-accent: #8c4035;
+  --rv-font-heading: Georgia, "Palatino Linotype", Palatino, "Book Antiqua", serif;
+  --rv-font-body: Georgia, "Times New Roman", Times, serif;
+  --rv-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --rv-size-title: 2.38em;
+  --rv-size-heading: 1.55em;
+  --rv-size-body: 22px;
+  --rv-size-caption: .68em;
+  --rv-size-code: .68em;
+  --rv-slide-padding: 68px;
+  --rv-block-spacing: 1.02em;
+  --rv-content-width: 100%;
+  --rv-radius: 2px;
+
+  --r-background-color: var(--rv-bg);
+  --r-main-color: var(--rv-text);
+  --r-main-font: var(--rv-font-body);
+  --r-main-font-size: var(--rv-size-body);
+  --r-main-line-height: 1.42;
+  --r-heading-color: var(--rv-text);
+  --r-heading-font: var(--rv-font-heading);
+  --r-heading-font-weight: 600;
+  --r-heading-line-height: 1.08;
+  --r-heading1-size: var(--rv-size-title);
+  --r-heading2-size: var(--rv-size-heading);
+  --r-heading3-size: 1.23em;
+  --r-heading4-size: 1em;
+  --r-heading-text-transform: none;
+  --r-heading-letter-spacing: -.012em;
+  --r-link-color: var(--rv-accent);
+  --r-link-color-hover: #642c24;
+  --r-code-font: var(--rv-font-mono);
+  --r-block-margin: var(--rv-block-spacing);
+  --r-selection-background-color: color-mix(in srgb, var(--rv-accent) 24%, transparent);
+}
+
+.reveal-viewport,
+.reveal { background: var(--rv-bg); color: var(--rv-text); }
+.reveal { font-family: var(--rv-font-body); font-size: var(--rv-size-body); }
+.reveal .slides section.rv-slide { box-sizing: border-box; padding: var(--rv-slide-padding); }
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4,
+.reveal h5,
+.reveal h6 {
+  font-family: var(--rv-font-heading);
+  color: var(--rv-text);
+  font-weight: 600;
+  letter-spacing: -.012em;
+  text-transform: none;
+}
+.reveal h1 { font-size: var(--rv-size-title); }
+.reveal h2 { font-size: var(--rv-size-heading); }
+.reveal a { color: var(--rv-accent); text-decoration-thickness: .06em; text-underline-offset: .12em; }
+.reveal pre { border-radius: var(--rv-radius); }
+.reveal figure.sr-media-caption figcaption,
+.reveal .rv-block-caption { color: var(--rv-muted); font-size: var(--rv-size-caption); font-style: italic; }
+
+.reveal table,
+.slide-editor table {
+  width: 100%;
+  margin: 1.15em 0;
+  border-collapse: collapse;
+  font-size: .80em;
+  line-height: 1.4;
+  color: var(--rv-text);
+  border-top: 2px solid var(--rv-text);
+  border-bottom: 2px solid var(--rv-text);
+}
+.reveal table th,
+.reveal table td,
+.slide-editor table th,
+.slide-editor table td {
+  padding: .48em .62em;
+  text-align: left;
+  vertical-align: top;
+  border: 0;
+}
+.reveal table th,
+.slide-editor table th {
+  font-variant: small-caps;
+  letter-spacing: .045em;
+  font-weight: 600;
+  border-bottom: 1px solid color-mix(in srgb, var(--rv-text) 65%, transparent);
+}
+.reveal table tbody tr + tr td,
+.slide-editor table tbody tr + tr td {
+  border-top: 1px solid color-mix(in srgb, var(--rv-text) 14%, transparent);
+}
+.reveal table th[align="center"], .reveal table td[align="center"],
+.slide-editor table th[align="center"], .slide-editor table td[align="center"] { text-align: center; }
+.reveal table th[align="right"], .reveal table td[align="right"],
+.slide-editor table th[align="right"], .slide-editor table td[align="right"] { text-align: right; }
+.reveal table th[align="left"], .reveal table td[align="left"],
+.slide-editor table th[align="left"], .slide-editor table td[align="left"] { text-align: left; }
+
+
+.reveal .rv-block-emphasis,
+.slide-editor .rv-block-emphasis {
+  font-size: 1.16em;
+  line-height: 1.32;
+  font-style: italic;
+  color: var(--rv-accent);
+}
+.reveal .rv-block-muted,
+.slide-editor .rv-block-muted {
+  color: var(--rv-muted);
+  font-size: .84em;
+  line-height: 1.48;
+}
+.reveal .rv-block-callout,
+.slide-editor .rv-block-callout {
+  padding: .72em .9em;
+  border-top: 1px solid color-mix(in srgb, var(--rv-accent) 55%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--rv-accent) 55%, transparent);
+  background: #ece3d2;
+  box-sizing: border-box;
+}
+.reveal blockquote,
+.reveal .rv-block-quote,
+.slide-editor blockquote,
+.slide-editor .rv-block-quote {
+  width: auto;
+  margin: 1.1em 0;
+  padding: .15em 0 .15em 1.05em;
+  border-left: 2px solid var(--rv-accent);
+  color: #554f47;
+  font-style: italic;
+  box-shadow: none;
+}

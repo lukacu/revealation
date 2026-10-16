@@ -1,0 +1,83 @@
+<!doctype html>
+<!-- Source for og-image.png, the link-preview card referenced by index.html.
+     Not part of the app; nothing loads it at runtime. To regenerate after
+     changing the wording or the domain:
+
+       python3 -m http.server 8000
+       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+         --headless --disable-gpu --window-size=1200,630 \
+         --force-device-scale-factor=2 --hide-scrollbars \
+         --screenshot=og-image.png http://localhost:8000/og-image.html
+
+     That writes 2400x1260, which is the 1.91:1 ratio link previews expect.
+     If you change those dimensions, update og:image:width/height too. -->
+<html><head><meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    background: #14161b;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* The card is itself a slide: the product showing its own output. */
+  .slide {
+    position: relative;
+    width: 1104px;
+    height: 534px;
+    background: #191919;
+    border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.55);
+    padding: 64px 70px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+  }
+  h1 {
+    font-size: 108px;
+    line-height: 1;
+    letter-spacing: -.035em;
+    font-weight: 700;
+    color: #f2f4f8;
+  }
+  .rule {
+    width: 140px; height: 7px;
+    border-radius: 4px;
+    background: #4f8cff;
+    margin: 34px 0 30px;
+  }
+  .tagline {
+    font-size: 37px;
+    line-height: 1.28;
+    color: #c8cedb;
+    max-width: 780px;
+  }
+  /* Bottom rail: the pitch and the host share one baseline, so nothing
+     floats in the empty lower half. */
+  .rail {
+    position: absolute;
+    left: 70px; right: 70px; bottom: 52px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 24px;
+    color: #8a92a3;
+  }
+  .rail b { color: #4f8cff; font-weight: 400; padding: 0 12px; }
+  .rail .host { color: #6e7688; font-size: 22px; }
+</style></head>
+<body>
+  <div class="slide">
+    <h1>Revealation</h1>
+    <div class="rule"></div>
+    <p class="tagline">reveal.js presentations, written and edited<br>right in your browser.</p>
+    <div class="rail">
+      <span>No build<b>·</b>No backend<b>·</b>No account</span>
+      <span class="host">slides.samplereality.com</span>
+    </div>
+  </div>
+</body></html>

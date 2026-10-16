@@ -1,0 +1,9 @@
+{
+  "id": "bubbles",
+  "name": "Bubbles",
+  "version": "1.0",
+  "description": "A soft field of drifting, translucent bubbles.",
+  "css": "bubbles.css",
+  "js": "bubbles.js",
+  "previewJs": "preview.js"
+}

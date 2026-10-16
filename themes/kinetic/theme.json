@@ -1,0 +1,11 @@
+{
+  "id": "kinetic",
+  "name": "Kinetic",
+  "version": "1.0",
+  "description": "A playful, energetic theme with rounded typography, bold accents, and colorful semantic blocks.",
+  "css": "theme.css",
+  "preview": "preview.svg",
+  "backgrounds": {
+    "recommended": ["grid"]
+  }
+}

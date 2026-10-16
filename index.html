@@ -1,0 +1,646 @@
+<!doctype html>
+<!--
+  Revealation editor shell
+  ------------------------
+  Purpose: declare the stable application DOM that core/UI source files bind to.
+  Behavior belongs under src/; styling belongs under styles/. Button order is
+  configured in src/config rather than by rearranging behavior code here.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- CSP must be the first non-charset element in <head> so it applies to all
+     subsequent resource loads. Mirrors what .htaccess sends on Apache hosts;
+     this meta tag is what enforces it on static hosts like GitHub Pages. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; media-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; frame-src 'self' https:; connect-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Revealation</title>
+<meta name="description" content="Revealation is a lightweight, local-first WYSIWYG editor for reveal.js presentations.">
+
+<!-- Revealation is primarily a local workspace app; hosted social-preview metadata is intentionally omitted. -->
+<meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1d23" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./__app__/icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./__app__/icons/icon-192.png">
+<link rel="stylesheet" href="./__app__/vendor/bootstrap-icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="./__app__/vendor/katex/dist/katex.min.css">
+<link rel="stylesheet" href="./__app__/vendor/highlight/monokai.min.css">
+<link rel="stylesheet" href="./__app__/styles/app.css">
+<link rel="stylesheet" href="./__app__/styles/sidebar.css">
+  <link rel="stylesheet" href="./__app__/styles/layouts.css">
+<link rel="stylesheet" href="./__app__/styles/interactive.css">
+</head>
+<body class="app-starting">
+<div id="app-loading-screen" class="app-loading-screen" role="status" aria-live="polite">
+  <div class="app-loading-mark" aria-hidden="true"><i class="bi bi-easel2"></i></div>
+  <strong>Preparing Revealation</strong>
+  <span>Checking your recent presentations…</span>
+</div>
+<header class="topbar">
+  <div class="topbar-left">
+    <button id="app-brand" class="topbar-icon-button app-logo-button" type="button" title="About Revealation" aria-label="About Revealation" aria-haspopup="dialog">
+      <img src="./__app__/logo/revealation_icon.png" alt="" aria-hidden="true"><span id="app-name" class="visually-hidden"></span>
+    </button>
+  </div>
+  <div class="topbar-center" aria-label="Current deck">
+    <span id="deck-title" class="deck-title-label" aria-label="Deck name" title="Deck name"></span>
+  </div>
+  <div class="topbar-right">
+    <button id="btn-deck-settings" class="topbar-icon-button" type="button" title="Deck settings (Ctrl/Cmd+Shift+,)" aria-label="Deck settings" aria-haspopup="dialog">
+      <i class="bi bi-sliders2" aria-hidden="true"></i>
+    </button>
+    <button id="btn-workspace-open" class="topbar-icon-button workspace-open-button" type="button" title="Open another presentation" aria-label="Open another presentation" hidden>
+      <i class="bi bi-folder2-open" aria-hidden="true"></i>
+    </button>
+    <button id="btn-export" class="topbar-icon-button" type="button" title="Export (Ctrl/Cmd+Shift+E)" aria-label="Export" aria-haspopup="dialog">
+      <i class="bi bi-box-arrow-up" aria-hidden="true"></i>
+    </button>
+    <button type="button" id="btn-undo" class="topbar-icon-button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" disabled><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+    <button type="button" id="btn-redo" class="topbar-icon-button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" disabled><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+    <div class="btn-split present-actions" role="group" aria-label="Present">
+      <button id="btn-preview" type="button" class="primary" title="Present from the first slide (Ctrl/Cmd+P)"><i class="bi bi-play-fill" aria-hidden="true"></i><span>Present</span></button>
+      <button id="btn-preview-here" type="button" class="primary" title="Present from the current slide (Ctrl/Cmd+Shift+P)" aria-label="Present from current slide"><span>From here</span><i class="bi bi-three-dots from-here-icon" aria-hidden="true"></i></button>
+    </div>
+    <button id="btn-settings" class="topbar-icon-button" type="button" title="Application settings (Ctrl/Cmd+,)" aria-label="Application settings" aria-haspopup="dialog"><i class="bi bi-gear" aria-hidden="true"></i></button>
+    <button id="btn-help" class="topbar-icon-button" type="button" title="Help (F1)" aria-label="Help" aria-haspopup="dialog"><i class="bi bi-question-circle" aria-hidden="true"></i></button>
+    <button id="btn-mobile-menu" class="topbar-icon-button" type="button" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false"><i class="bi bi-three-dots-vertical" aria-hidden="true"></i></button>
+  </div>
+</header>
+<div id="status" class="app-status-toast" role="status" aria-live="polite" hidden></div>
+<div id="pwa-update-banner" class="pwa-update-banner" role="status" aria-live="polite" hidden>
+  <span>A new Revealation version is available.</span>
+  <button id="pwa-update-now" type="button">Update now</button>
+  <button id="pwa-update-later" type="button">Later</button>
+</div>
+
+<main class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <span>Slides</span>
+      <button id="btn-add-slide" type="button" class="add-slide" title="Add a slide to the end of the deck (Ctrl/Cmd+Shift+Enter)" aria-label="Add slide"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+      <button id="btn-slides-close" type="button" class="sidebar-close" aria-label="Close slide list"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+    </div>
+    <ol id="slide-list" class="slide-list"></ol>
+    <div class="sidebar-foot" aria-label="Deck information">
+      <div class="deck-stats" aria-label="Deck statistics">
+        <span><strong id="deck-slide-count">0</strong><small>slides</small></span>
+        <span><strong id="deck-active-slide-count">0</strong><small>active</small></span>
+        <span><strong id="deck-hidden-slide-count">0</strong><small>hidden</small></span>
+      </div>
+      <div class="sidebar-save-state">
+        <span id="save-indicator" class="save-indicator" data-state="saved" role="status" aria-live="polite" aria-label="Saved" title="Saved">
+          <i class="bi bi-check-circle-fill" aria-hidden="true"></i><span id="save-label">Saved</span>
+        </span>
+      </div>
+    </div>
+  </aside>
+
+  <section class="editor">
+    <div class="toolbar" id="toolbar" role="toolbar" aria-label="Slide formatting">
+      <div class="tb-group" role="group" aria-label="Paragraph style">
+        <select id="block-style" class="toolbar-select tb-style" aria-label="Paragraph style" title="Style of the block the cursor is in">
+          <option value="" disabled hidden>Mixed</option>
+          <option value="p">Body</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="emphasis">Emphasis</option>
+          <option value="muted">Muted</option>
+          <option value="callout">Callout</option>
+          <option value="blockquote">Quote</option>
+          <option value="inline-code">Inline code</option>
+        </select>
+      </div>
+      <div class="tb-group" role="group" aria-label="Text formatting">
+        <button type="button" data-cmd="bold" title="Bold (Ctrl/Cmd+B)" aria-label="Bold" aria-pressed="false"><i class="bi bi-type-bold"></i></button>
+        <button type="button" data-cmd="italic" title="Italic (Ctrl/Cmd+I)" aria-label="Italic" aria-pressed="false"><i class="bi bi-type-italic"></i></button>
+        <button type="button" data-cmd="underline" title="Underline (Ctrl/Cmd+U)" aria-label="Underline" aria-pressed="false"><i class="bi bi-type-underline"></i></button>
+        <button type="button" data-cmd="strikeThrough" title="Strikethrough" aria-label="Strikethrough" aria-pressed="false"><i class="bi bi-type-strikethrough"></i></button>
+      </div>
+      <div class="tb-group" role="group" aria-label="Lists">
+        <button type="button" data-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list" aria-pressed="false"><i class="bi bi-list-ul"></i></button>
+        <button type="button" data-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list" aria-pressed="false"><i class="bi bi-list-ol"></i></button>
+      </div>
+      <div class="tb-group" role="group" aria-label="View">
+        <button type="button" id="toggle-source" hidden aria-hidden="true" tabindex="-1"></button>
+      </div>
+      <div class="tb-group" role="group" aria-label="Insert">
+        <button type="button" data-action="link" title="Link the selected text to a URL" aria-label="Link"><i class="bi bi-link-45deg"></i></button>
+        <button type="button" data-action="image" title="Insert an image" aria-label="Insert image"><i class="bi bi-image"></i></button>
+        <button type="button" data-action="video" title="Insert a video" aria-label="Insert video"><i class="bi bi-film"></i></button>
+        <button type="button" data-action="audio" title="Insert audio" aria-label="Insert audio"><i class="bi bi-volume-up"></i></button>
+        <button type="button" data-action="interactive" title="Embed local interactive HTML/JavaScript content" aria-label="Insert interactive content"><i class="bi bi-window-stack"></i></button>
+        <button type="button" data-action="align-left" title="Align selection/current block left" aria-label="Align left" aria-pressed="false"><i class="bi bi-text-left"></i></button>
+        <button type="button" data-action="align-center" title="Center selection/current block, or insert an empty centered block" aria-label="Align center" aria-pressed="false"><i class="bi bi-text-center"></i></button>
+        <button type="button" data-action="align-right" title="Align selection/current block right, or insert an empty right-aligned block" aria-label="Align right" aria-pressed="false"><i class="bi bi-text-right"></i></button>
+        <button type="button" data-action="math" title="Insert a LaTeX equation" aria-label="Insert equation"><i class="bi bi-braces-asterisk"></i></button>
+        <button type="button" data-action="code-block" title="Insert syntax-highlighted code" aria-label="Insert code block"><i class="bi bi-code-square"></i></button>
+        <button type="button" data-action="hr" title="Insert horizontal rule" aria-label="Insert horizontal rule"><i class="bi bi-dash-lg"></i></button>
+        <button type="button" data-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting"><i class="bi bi-eraser"></i></button>
+      </div>
+      <div class="tb-group tb-slide-actions" role="group" aria-label="Slide settings">
+        <button type="button" id="btn-slide-layout" data-action="layout" title="Slide layout" aria-label="Slide layout"><i class="bi bi-grid-3x2-gap"></i></button>
+        <button type="button" id="btn-slide-background" title="Slide background" aria-label="Slide background" aria-haspopup="dialog"><i class="bi bi-layers"></i></button>
+        <button type="button" id="btn-notes-toggle" title="Toggle slide notes" aria-label="Toggle slide notes" aria-pressed="false"><i class="bi bi-card-text"></i></button>
+        <button type="button" id="btn-markdown-toolbar" title="Toggle deck Markdown (Ctrl/Cmd+Shift+M)" aria-label="Toggle deck Markdown" aria-pressed="false"><i class="bi bi-markdown"></i></button>
+      </div>
+    </div>
+
+    <div id="media-toolbar" class="media-toolbar" hidden aria-label="Selected media options">
+      <span class="media-kind"><i class="bi bi-bounding-box" aria-hidden="true"></i><span id="media-kind">Media</span></span>
+      <label class="media-width-control" for="media-width">
+        <span>Width</span>
+        <input id="media-width" type="range" min="10" max="100" step="1" value="100">
+        <output id="media-width-value" for="media-width">100%</output>
+      </label>
+      <button type="button" id="media-reset-size" class="media-reset-size" title="Remove the custom media size">Natural size</button>
+      <button type="button" id="media-reset-crop" class="media-reset-size" hidden title="Remove the crop and show the full image">Reset crop</button>
+      <span class="media-hint">Shift-drag handles to crop</span>
+      <label id="media-caption-control" class="media-caption-control" for="media-caption">
+        <span>Caption</span>
+        <input id="media-caption" type="text" maxlength="500" placeholder="Optional caption">
+      </label>
+      <div id="video-settings" class="video-settings" hidden>
+        <label><input id="video-autoplay" type="checkbox"> Autoplay</label>
+        <label><input id="video-controls" type="checkbox"> Controls</label>
+        <label><input id="video-loop" type="checkbox"> Loop</label>
+        <label><input id="video-muted" type="checkbox"> Muted</label>
+        <span class="media-hint">Autoplay is most reliable with Muted.</span>
+      </div>
+      <div id="interactive-settings" class="video-settings" hidden>
+        <label>Height <input id="interactive-height" class="interactive-height-input" type="number" min="120" max="1200" step="10" value="480"> px</label>
+        <label><input id="interactive-enabled" type="checkbox" checked> Interactive</label>
+        <label><input id="interactive-preload" type="checkbox"> Preload</label>
+        <label><input id="interactive-border" type="checkbox"> Border</label>
+        <label><input id="interactive-scrollbars" type="checkbox"> Scrollbars</label>
+        <button type="button" id="interactive-edit" class="media-reset-size">Edit…</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="slide-frame reveal" id="slide-frame">
+        <div id="slide-bg-layer" class="slide-bg-layer" aria-hidden="true"></div>
+        <div id="slide-editor" class="slide-editor" contenteditable="true" spellcheck="true"></div>
+        <textarea id="slide-source" class="slide-source" spellcheck="false" hidden></textarea>
+        <div id="slide-bg-badge" class="slide-bg-badge" hidden></div>
+        <div id="drop-overlay" class="drop-overlay" hidden>Drop image or video to embed</div>
+        <div id="media-selection" class="media-selection" hidden aria-hidden="true">
+          <span class="media-resize-handle media-resize-nw" data-media-resize="nw" title="Drag to resize"></span>
+          <span class="media-resize-handle media-resize-n" data-media-resize="n" title="Drag to resize"></span>
+          <span class="media-resize-handle media-resize-ne" data-media-resize="ne" title="Drag to resize"></span>
+          <span class="media-resize-handle media-resize-e" data-media-resize="e" title="Drag to resize"></span>
+          <span class="media-resize-handle media-resize-se" data-media-resize="se" title="Drag to resize"></span>
+          <span class="media-resize-handle media-resize-s" data-media-resize="s" title="Drag to resize"></span>
+          <span class="media-resize-handle media-resize-sw" data-media-resize="sw" title="Drag to resize"></span>
+          <span class="media-resize-handle media-resize-w" data-media-resize="w" title="Drag to resize"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Small screens only. Keeps slide navigation/addition available
+         while the desktop slide list is hidden. Slide settings remain in the
+         formatting toolbar and the Notes sidebar. -->
+    <div class="mobile-slidebar" id="mobile-slidebar">
+      <button type="button" id="m-prev" title="Previous slide" aria-label="Previous slide"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
+      <button type="button" id="m-picker" class="m-picker" title="Show all slides" aria-label="Show all slides" aria-expanded="false"><i class="bi bi-list-ul" aria-hidden="true"></i><span id="m-position">Slide 1</span></button>
+      <button type="button" id="m-next" title="Next slide" aria-label="Next slide"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+      <button type="button" id="m-add" title="Add slide" aria-label="Add slide"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+    </div>
+
+    <div id="markdown-pane" class="markdown-pane" hidden>
+      <div class="markdown-head">
+        <div class="markdown-about">
+          <strong>Deck markdown</strong>
+          <span class="markdown-hint">New slide on <code>---</code>, sub-slide on <code>--</code>, speaker notes in <code>::: notes</code></span>
+        </div>
+        <div class="markdown-actions">
+          <span id="markdown-status" class="markdown-status" role="status"></span>
+          <button type="button" id="markdown-close" title="Close Markdown mode; asks before discarding unapplied changes">Close</button>
+          <button type="button" id="markdown-apply" class="primary" title="Apply Markdown to the deck and return to slide editing (Ctrl/Cmd+S)">Apply</button>
+        </div>
+      </div>
+      <div class="markdown-editor-shell">
+        <pre id="markdown-highlight" class="markdown-highlight" aria-hidden="true"></pre>
+        <textarea id="markdown-text" wrap="off" spellcheck="false" aria-label="Deck markdown"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <aside id="notes-panel" class="notes-panel" hidden>
+    <div class="notes-panel-head">
+      <div>
+        <strong>Slide notes</strong>
+        <span id="notes-panel-slide" class="notes-panel-slide">slide</span>
+      </div>
+      <button type="button" id="notes-panel-close" title="Close notes sidebar" aria-label="Close notes sidebar"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+    </div>
+    <div class="notes-panel-options" aria-label="Slide options">
+      <label class="toggle-row" title="Nest this slide underneath the preceding slide">
+        <span><strong>Subslide</strong><small>Place under the preceding slide</small></span>
+        <input id="slide-subslide" type="checkbox" role="switch">
+      </label>
+      <label class="toggle-row" title="Mark this slide as work in progress">
+        <span><strong>Work in progress</strong><small>Mark this slide as unfinished</small></span>
+        <input id="slide-wip" type="checkbox" role="switch">
+      </label>
+      <label class="toggle-row" title="Hide this slide from Present mode and presentation exports">
+        <span><strong>Hidden</strong><small>Keep editable, omit from presentation and exports</small></span>
+        <input id="slide-hidden" type="checkbox" role="switch">
+      </label>
+    </div>
+    <label class="notes-panel-editor" for="notes-panel-text">
+      <span>Speaker notes</span>
+      <textarea id="notes-panel-text" placeholder="Notes shown in the speaker view (press S during a presentation)"></textarea>
+    </label>
+  </aside>
+
+  <div id="mobile-scrim" class="mobile-scrim" hidden></div>
+</main>
+
+<div id="present-modal" class="modal present-modal" hidden>
+  <!-- Deliberately NOT sandboxed — Chrome's PDF viewer refuses to render
+       PDF iframe backgrounds inside a sandboxed iframe on production hosts.
+       See "Security notes" in the README. -->
+  <iframe id="present-frame" title="Presentation" allowfullscreen></iframe>
+</div>
+
+
+<div id="code-modal" class="modal tool-modal" hidden>
+  <div class="tool-card code-tool-card">
+    <div class="modal-head">
+      <strong>Code block</strong>
+      <button type="button" id="code-close">Close</button>
+    </div>
+    <div class="tool-body">
+      <label class="field">Language
+        <select id="code-language">
+          <option value="python">Python</option>
+          <option value="cpp">C++</option>
+          <option value="c">C</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+          <option value="bash">Bash</option>
+          <option value="json">JSON</option>
+          <option value="html">HTML/XML</option>
+          <option value="css">CSS</option>
+          <option value="plaintext">Plain text</option>
+        </select>
+      </label>
+      <textarea id="code-text" class="tool-textarea code-textarea" spellcheck="false" placeholder="Paste or type code here"></textarea>
+      <p class="tool-hint">Double-click an existing code block to edit it again.</p>
+      <div class="tool-actions">
+        <button type="button" id="code-cancel">Cancel</button>
+        <button type="button" id="code-insert" class="primary">Insert code</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="math-modal" class="modal tool-modal" hidden>
+  <div class="tool-card math-tool-card">
+    <div class="modal-head">
+      <strong>LaTeX equation</strong>
+      <button type="button" id="math-close">Close</button>
+    </div>
+    <div class="tool-body">
+      <label class="field">Style
+        <select id="math-display">
+          <option value="0">Inline</option>
+          <option value="1">Display equation</option>
+        </select>
+      </label>
+      <textarea id="math-text" class="tool-textarea math-textarea" spellcheck="false" placeholder="\\mathbf{x}' = K[R|t]\\mathbf{X}"></textarea>
+      <div id="math-preview" class="math-preview" aria-live="polite"></div>
+      <p class="tool-hint">In Markdown, equations round-trip as <code>\\(...\\)</code> or <code>\\[...\\]</code>.</p>
+      <div class="tool-actions">
+        <button type="button" id="math-cancel">Cancel</button>
+        <button type="button" id="math-insert" class="primary">Insert equation</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="layout-modal" class="modal tool-modal" hidden>
+  <div class="tool-card layout-tool-card">
+    <div class="modal-head">
+      <strong>Insert layout</strong>
+      <button type="button" id="layout-close">Close</button>
+    </div>
+    <div class="tool-body">
+      <p class="tool-hint">Select slide layout. Note that changing the layout of an existing slide may reset its content, so be careful when making changes.</p>
+      <div id="layout-choices" class="layout-choices" aria-label="Available layouts"></div>
+    </div>
+  </div>
+</div>
+
+<div id="background-modal" class="modal tool-modal" hidden>
+  <div class="tool-card background-tool-card">
+    <div class="modal-head">
+      <strong>Slide background</strong>
+      <button type="button" id="background-close">Close</button>
+    </div>
+    <div class="tool-body">
+      <p class="tool-hint">Choose a curated background for this slide. Leave it at the theme default for the normal theme appearance.</p>
+      <div id="background-choices" class="background-choices" role="group" aria-label="Slide background"></div>
+      <!-- RV-COMPAT(background-reveal): REMOVE BEFORE PUBLIC RELEASE. -->
+      <span id="background-legacy-notice" class="background-legacy-notice" hidden></span>
+    </div>
+  </div>
+</div>
+
+<div id="interactive-modal" class="modal tool-modal" hidden>
+  <div class="tool-card interactive-tool-card">
+    <div class="modal-head">
+      <strong>Interactive</strong>
+      <button type="button" id="interactive-close">Close</button>
+    </div>
+    <div class="tool-body">
+      <label class="tool-field">
+        <span>HTML entry point</span>
+        <input id="interactive-src" list="interactive-files-list" type="text" spellcheck="false" placeholder="interactive/example/index.html">
+        <datalist id="interactive-files-list"></datalist>
+      </label>
+      <div class="interactive-grid">
+        <label class="tool-field"><span>Width (%)</span><input id="interactive-width" type="number" min="10" max="100" step="1" value="100"></label>
+        <label class="tool-field"><span>Height (px)</span><input id="interactive-modal-height" type="number" min="120" max="1200" step="10" value="480"></label>
+      </div>
+      <div class="interactive-options">
+        <label><input id="interactive-modal-enabled" type="checkbox" checked> Interactive in presentation</label>
+        <label><input id="interactive-modal-preload" type="checkbox"> Preload</label>
+        <label><input id="interactive-modal-border" type="checkbox"> Border</label>
+        <label><input id="interactive-modal-scrollbars" type="checkbox"> Scrollbars</label>
+      </div>
+      <p class="tool-hint">The interactive content is loaded from the workspace directory in an iframe. In the WYSIWYG editor the iframe is click-through-disabled so it can be selected and resized safely.</p>
+      <div class="tool-actions">
+        <button type="button" id="interactive-cancel">Cancel</button>
+        <button type="button" id="interactive-insert" class="primary">Insert interactive</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="workspace-picker-modal" class="modal settings-modal workspace-picker-modal" hidden>
+  <div class="settings-card workspace-picker-card">
+    <div class="modal-head"><strong id="workspace-picker-title">Welcome to Revealation</strong></div>
+    <div class="settings-body">
+      <p id="workspace-picker-message" class="workspace-picker-message">Open a presentation folder to start creating, editing, and presenting.</p>
+      <p id="workspace-picker-detail" class="settings-intro"></p>
+      <section id="workspace-picker-recent-section" class="workspace-picker-recent-section" hidden>
+        <div id="workspace-picker-recent-title" class="workspace-picker-section-title">Recent presentations</div>
+        <div id="workspace-picker-recent" class="workspace-picker-recent" role="list"></div>
+      </section>
+      <div class="workspace-picker-actions">
+        <button id="workspace-picker-choose" type="button" class="primary">Open a new presentation…</button>
+        <button id="workspace-picker-browser" type="button">Browser storage</button>
+        <button id="workspace-picker-cancel" type="button" hidden>Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="assets-modal" class="modal tool-modal" hidden>
+  <div class="tool-card assets-tool-card">
+    <div class="modal-head">
+      <strong id="assets-title">Insert media</strong>
+      <button type="button" id="assets-close">Close</button>
+    </div>
+    <div class="tool-body assets-body">
+      <div class="assets-toolbar">
+        <label class="assets-search">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <input id="assets-search" type="search" placeholder="Filter files" aria-label="Filter files">
+        </label>
+        <label class="button-like" for="asset-file-input"><i class="bi bi-upload" aria-hidden="true"></i><span id="asset-upload-label">Upload media</span></label>
+        <button type="button" id="assets-refresh"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Refresh</button>
+        <span id="assets-hint" class="tool-hint">Choose a reusable file or upload a new one.</span>
+      </div>
+      <div id="assets-grid" class="assets-grid"></div>
+      <p id="assets-empty" class="assets-empty">No usable files found in this workspace yet. Add media here or copy files into the project directory.</p>
+    </div>
+  </div>
+</div>
+
+<div id="projects-modal" class="modal projects-modal" hidden>
+  <div class="modal-head">
+    <strong>Projects</strong>
+    <button type="button" id="projects-close">Close</button>
+  </div>
+  <div class="projects-body">
+    <div class="projects-toolbar">
+      <button type="button" id="projects-new">+ New project</button>
+      <button type="button" id="projects-export-all">Export presentation</button>
+      <label class="projects-import">
+        <span>Import presentation…</span>
+        <input id="projects-import-input" type="file" accept=".revealation,application/vnd.revealation.deck+zip" multiple hidden>
+      </label>
+    </div>
+    <ul id="projects-list" class="projects-list" aria-label="Saved projects"></ul>
+  </div>
+</div>
+
+<div id="settings-modal" class="modal settings-modal" hidden>
+  <div class="settings-card app-settings-card">
+    <div class="modal-head">
+      <strong>Application settings</strong>
+      <button type="button" id="settings-close">Close</button>
+    </div>
+    <div class="settings-body">
+      <p class="settings-intro">Editor preferences and presentation behavior. Visual theme, transitions, and slide canvas settings live under Deck settings.</p>
+      <div class="settings-form">
+        <h4>Appearance</h4>
+        <div class="settings-row">
+          <label>Interface mode<span class="help">Choose the editor appearance. Presentation themes are independent.</span></label>
+          <div id="ui-theme-choice" class="ui-theme-choice" role="group" aria-label="Interface mode">
+            <button type="button" id="settings-theme-light" data-ui-theme="light"><i class="bi bi-sun" aria-hidden="true"></i> Light</button>
+            <button type="button" id="settings-theme-dark" data-ui-theme="dark"><i class="bi bi-moon" aria-hidden="true"></i> Dark</button>
+          </div>
+        </div>
+      </div>
+      <div id="presentation-settings-form" class="settings-form presentation-settings-form"></div>
+    </div>
+  </div>
+</div>
+
+<div id="about-modal" class="modal about-modal" hidden>
+  <div class="about-card">
+    <div class="modal-head">
+      <strong id="about-title"></strong>
+      <button type="button" id="about-close">Close</button>
+    </div>
+    <div id="about-body" class="about-body"></div>
+  </div>
+</div>
+
+<div id="deck-settings-modal" class="modal theme-modal" hidden>
+  <div class="theme-card deck-settings-card">
+    <div class="modal-head">
+      <div>
+        <strong>Deck settings</strong>
+        <div class="theme-picker-help">Presentation metadata and curated visual settings.</div>
+      </div>
+      <button type="button" id="deck-settings-close">Close</button>
+    </div>
+    <div class="style-dialog-body">
+      <section class="style-section" aria-labelledby="deck-metadata-heading">
+        <h4 id="deck-metadata-heading">Metadata</h4>
+        <div class="settings-form deck-metadata-form">
+          <div class="settings-row">
+            <label for="deck-settings-name">Deck name<span class="help">Used in the editor and as the default export filename.</span></label>
+            <input id="deck-settings-name" type="text" autocomplete="off">
+          </div>
+          <div class="settings-row">
+            <label for="deck-settings-author">Author<span class="help">Optional presentation author metadata.</span></label>
+            <input id="deck-settings-author" type="text" autocomplete="off" placeholder="Author name">
+          </div>
+          <div class="settings-row deck-metadata-readonly">
+            <label>Created</label><span id="deck-settings-created"></span>
+          </div>
+          <div class="settings-row deck-metadata-readonly">
+            <label>Last modified</label><span id="deck-settings-modified"></span>
+          </div>
+        </div>
+      </section>
+      <section class="style-section" aria-labelledby="style-theme-heading">
+        <h4 id="style-theme-heading">Theme</h4>
+        <div id="theme-choices" class="theme-choices" role="listbox" aria-label="Presentation themes"></div>
+        <select id="theme-select" hidden aria-hidden="true" tabindex="-1"></select>
+      </section>
+      <section class="style-section" aria-labelledby="style-motion-heading">
+        <h4 id="style-motion-heading">Motion</h4>
+        <form id="style-motion-form" class="settings-form style-settings-form"></form>
+      </section>
+      <section class="style-section" aria-labelledby="style-layout-heading">
+        <h4 id="style-layout-heading">Slide canvas</h4>
+        <form id="style-layout-form" class="settings-form style-settings-form"></form>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div id="export-modal" class="modal settings-modal" hidden>
+  <div class="settings-card export-card">
+    <div class="modal-head">
+      <strong>Export deck</strong>
+      <button type="button" id="export-close">Close</button>
+    </div>
+    <div class="settings-body export-body">
+      <p class="settings-intro">Choose how to save or package this deck.</p>
+      <div class="export-options">
+        <section class="export-option export-option-featured">
+          <div><strong>Standalone HTML</strong><p>One self-contained Reveal.js presentation.</p><div class="export-settings" aria-label="Standalone HTML Reveal.js settings"><label><input id="export-html-controls" type="checkbox"> Navigation controls</label><label><input id="export-html-progress" type="checkbox"> Progress bar</label><small>These settings apply only to this HTML export.</small></div><p id="export-html-warning" class="export-warning" hidden><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> This deck contains interactive content that may depend on local scripts, data, workers, or a server. Use the ZIP package when it must remain fully functional.</p></div>
+          <div class="export-option-actions">
+            <button id="btn-export-html" class="export-icon-button" type="button" title="Export standalone HTML" aria-label="Export standalone HTML"><i class="bi bi-filetype-html" aria-hidden="true"></i></button>
+          </div>
+        </section>
+        <section class="export-option">
+          <div><strong>Revealation presentation</strong><p>Portable presentation with its locally managed assets.</p></div>
+          <button id="btn-export-zip" class="export-icon-button" type="button" title="Export Revealation presentation" aria-label="Export Revealation presentation"><i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i></button>
+        </section>
+        <section class="export-option">
+          <div><strong>PDF</strong><p>Open Reveal.js print view for saving to PDF.</p></div>
+          <button id="btn-export-pdf" class="export-icon-button" type="button" title="Open PDF view" aria-label="Open PDF view"><i class="bi bi-filetype-pdf" aria-hidden="true"></i></button>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="help-modal" class="modal settings-modal" hidden>
+  <div class="settings-card help-card">
+    <div class="modal-head">
+      <strong>Help</strong>
+      <button type="button" id="help-close">Close</button>
+    </div>
+    <div class="settings-body help-body">
+      <section class="help-section">
+        <h4>Working with Revealation</h4>
+        <p>Edit the current slide directly, use the slide list to navigate, choose semantic layouts and curated backgrounds from Slide options, and use Deck settings for presentation-wide visual choices.</p>
+      </section>
+      <section class="help-section">
+        <h4>Keyboard shortcuts</h4>
+        <dl class="shortcut-list">
+          <dt><kbd>Ctrl/Cmd</kbd> + <kbd>Z</kbd></dt><dd>Undo</dd>
+          <dt><kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></dt><dd>Redo</dd>
+          <dt><kbd>Ctrl/Cmd</kbd> + <kbd>P</kbd></dt><dd>Present from beginning</dd>
+          <dt><kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd></dt><dd>Present from current slide</dd>
+          <dt><kbd>Ctrl/Cmd</kbd> + <kbd>,</kbd></dt><dd>Application settings</dd>
+          <dt><kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>,</kbd></dt><dd>Deck settings</dd>
+          <dt><kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>E</kbd></dt><dd>Export</dd>
+          <dt><kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd></dt><dd>Open/close deck Markdown</dd>
+          <dt><kbd>F1</kbd></dt><dd>Help</dd>
+        </dl>
+      </section>
+      <section class="help-section">
+        <h4>Advanced tools</h4>
+        <p class="settings-intro">Markdown recovery, project management and developer tools live here so the normal authoring interface stays focused.</p>
+        <div class="help-actions">
+          <button id="btn-markdown" type="button" title="Edit deck Markdown (Ctrl/Cmd+Shift+M)"><i class="bi bi-markdown" aria-hidden="true"></i> Edit deck Markdown</button>
+          <button id="btn-markdown-recover" type="button"><i class="bi bi-eraser" aria-hidden="true"></i> Recover Markdown</button>
+          <button id="btn-projects" type="button"><i class="bi bi-collection" aria-hidden="true"></i> Project library</button>
+          <button id="btn-workspace-folder" type="button" hidden><i class="bi bi-folder2-open" aria-hidden="true"></i> Change presentation folder</button>
+          <button id="btn-new" type="button"><i class="bi bi-file-earmark-plus" aria-hidden="true"></i> New deck</button>
+          <a class="button-like" href="./__app__/docs/DEVELOPMENT.md" target="_blank" rel="noopener noreferrer"><i class="bi bi-code-slash" aria-hidden="true"></i> Developer docs</a>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div id="slide-context-menu" class="context-menu" role="menu" hidden></div>
+<div id="toolbar-menu" class="context-menu" role="menu" hidden></div>
+
+<input id="file-input" type="file" accept="image/*" hidden>
+<input id="asset-file-input" type="file" accept="image/*,video/*,audio/*" multiple hidden>
+
+<script src="./__app__/vendor/jszip/jszip.min.js"
+        integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
+        crossorigin="anonymous"></script>
+<script src="./__app__/vendor/turndown/turndown.js"
+        integrity="sha384-OGauEFaI5hnS8jXK4qdSGShAUAObMBKoLXgcL1ORhRh7ulx5jPZH35qVpacIEA4Z"
+        crossorigin="anonymous"></script>
+<script src="./__app__/vendor/marked/marked.min.js"
+        integrity="sha384-YTBHtsL8yVTHcLakYNyrOfK3K+QQcXiECuaALJ+3j7Mo681Rtzadt8NR6WrZH+eQ"
+        crossorigin="anonymous"></script>
+<script src="./__app__/vendor/katex/dist/katex.min.js"></script>
+<script src="./__app__/vendor/highlight/highlight.min.js"></script>
+<!-- Revealation source files are intentionally plain browser scripts: no build step. -->
+<script src="./__app__/src/core/revealation.js"></script>
+<script src="./__app__/src/platform/browser.js"></script>
+<script src="./__app__/src/platform/platform.js"></script>
+<script src="./__app__/src/core/slide-model.js"></script>
+<script src="./__app__/src/core/history.js"></script>
+<script src="./__app__/src/theme/registry.js"></script>
+<script src="./__app__/extensions/themes/register.js"></script>
+<script src="./__app__/src/background/registry.js"></script>
+<script src="./__app__/extensions/backgrounds/register.js"></script>
+<script src="./__app__/src/config/toolbar.js"></script>
+<script src="./__app__/src/config/topbar.js"></script>
+<script src="./__app__/src/storage/indexeddb.js"></script>
+<script src="./__app__/src/storage/backup.js"></script>
+<script src="./__app__/src/storage/package.js"></script>
+<script src="./__app__/src/storage/workspace.js"></script>
+<script src="./__app__/src/storage/directory.js"></script>
+<script src="./__app__/src/pwa/runtime.js"></script>
+<script src="./__app__/src/content/interactive.js"></script>
+<script src="./__app__/src/content/html.js"></script>
+<script src="./__app__/src/layout/registry.js"></script>
+<script src="./__app__/src/layout/builtins.js"></script>
+<script src="./__app__/extensions/layouts/custom.js"></script>
+<script src="./__app__/src/serialization/directives.js"></script>
+<script src="./__app__/src/serialization/notes.js"></script>
+<script src="./__app__/src/layout/blocks.js"></script>
+<script src="./__app__/src/serialization/deck.js"></script>
+<script src="./__app__/src/editor/dom-selection.js"></script>
+<script src="./__app__/src/editor/content-normalization.js"></script>
+<script src="./__app__/src/editor/rich-text.js"></script>
+<script src="./__app__/src/ui/toolbar.js"></script>
+<script src="./__app__/src/ui/topbar.js"></script>
+<script src="./__app__/src/ui/sidebar.js"></script>
+<script src="./__app__/src/ui/dialogs.js"></script>
+<script src="./__app__/src/export/pdf.js"></script>
+<script src="./__app__/src/export/deck.js"></script>
+<script src="./__app__/src/core/application.js"></script>
+</body>
+</html>

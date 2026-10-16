@@ -1,0 +1,83 @@
+# Operating systems
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*~
+.directory
+.Trash-*
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node / browser tooling
+node_modules/
+.npm/
+.yarn/
+.pnp.*
+/coverage/
+*.tsbuildinfo
+
+# Logs and transient runtime files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# Local environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Generated deployment and build output
+/dist/
+/bin/
+/build/
+/out/
+/_site/
+/.cache/
+/.tmp/
+/tmp/
+/.storage/
+/.neu-builder-cache/
+/.neu-builder-staging/
+/neutralinojs.log
+/neutralino.js
+/neutralino.d.ts
+
+# Deferred Neutralino integration (kept locally, out of the repository)
+/.local/neutralino/
+
+# Local assistant/tool notes
+CLAUDE.md

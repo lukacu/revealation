@@ -1,0 +1,60 @@
+/*
+ * Revealation — Interactive content styles
+ * =========================================
+ *
+ * Editor-only presentation and dialog styling for the iframe-backed
+ * `interactive` content type. Presentation/export CSS lives in the deck
+ * renderer because it is embedded into reveal.js output.
+ */
+
+/* Revealation interactive embeds */
+.slide-editor .sr-interactive,
+/* RV-COMPAT(interactive-demo): REMOVE .sr-demo selectors BEFORE PUBLIC RELEASE. */
+.slide-editor .sr-demo {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  min-height: 120px;
+  margin: .35em auto .7em;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--panel) 75%, transparent);
+  cursor: default;
+}
+.slide-editor .sr-interactive iframe,
+.slide-editor .sr-demo iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+  overflow: hidden;
+  pointer-events: none; /* editor selection wins over demo interaction */
+}
+.slide-editor .sr-interactive[data-scrollbars="1"] iframe,
+.slide-editor .sr-demo[data-scrollbars="1"] iframe {
+  overflow: auto;
+}
+.slide-editor .sr-interactive[data-border="1"] iframe,
+.slide-editor .sr-demo[data-border="1"] iframe {
+  border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
+  border-radius: 6px;
+}
+.interactive-height-input { width: 5.5em; }
+.interactive-tool-card { width: min(620px, calc(100vw - 32px)); }
+.interactive-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.interactive-options { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0; }
+.interactive-options label { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 640px) { .interactive-grid { grid-template-columns: 1fr; } }
+
+/* Semantic media captions are intentionally minimally styled here. Themes
+   can target `.sr-media-caption figcaption` in presentation CSS. */
+.sr-media-caption {
+  margin: .35em auto .7em;
+  max-width: 100%;
+}
+.sr-media-caption figcaption {
+  color: var(--muted);
+  font-size: .72em;
+  line-height: 1.25;
+  text-align: center;
+}

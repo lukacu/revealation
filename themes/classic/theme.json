@@ -1,0 +1,11 @@
+{
+  "id": "classic",
+  "name": "Classic",
+  "version": "1.0",
+  "description": "A warm editorial theme with serif typography, restrained rules, and book-like rhythm.",
+  "css": "theme.css",
+  "preview": "preview.svg",
+  "backgrounds": {
+    "recommended": []
+  }
+}

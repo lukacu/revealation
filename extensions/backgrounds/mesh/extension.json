@@ -1,0 +1,9 @@
+{
+  "id": "mesh",
+  "name": "Mesh",
+  "version": "1.0",
+  "description": "A slowly shifting ambient mesh of connected points.",
+  "css": "mesh.css",
+  "js": "mesh.js",
+  "previewJs": "preview.js"
+}
