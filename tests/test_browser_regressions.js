@@ -19,6 +19,19 @@ const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), 'revealation-chrome-'));
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function assert(condition, message) { if (!condition) throw new Error(message); }
 
+async function stopChrome(chrome) {
+  if (chrome.exitCode === null) {
+    await new Promise(resolve => {
+      const timeout = setTimeout(() => {
+        chrome.kill('SIGKILL');
+        resolve();
+      }, 2000);
+      chrome.once('close', () => { clearTimeout(timeout); resolve(); });
+      chrome.kill('SIGTERM');
+    });
+  }
+}
+
 async function waitForTarget(chrome, getStderr) {
   for (let i = 0; i < 300; i += 1) {
     if (chrome.exitCode !== null) {
@@ -1679,9 +1692,8 @@ async function main() {
     console.log('browser regressions: OK');
   } finally {
     try { ws?.close(); } catch (_) {}
-    chrome.kill('SIGTERM');
-    await sleep(150);
-    try { fs.rmSync(PROFILE, { recursive: true, force: true }); } catch (_) {}
+    await stopChrome(chrome);
+    try { fs.rmSync(PROFILE, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch (_) {}
   }
 }
 
