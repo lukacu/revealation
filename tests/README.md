@@ -29,7 +29,7 @@ The suite checks:
 Some OS/browser-integrated behavior (drag/drop edge cases and the native Save as PDF dialog) still benefits from a manual smoke test; see `docs/TESTING.md`.
 ## Browser regressions
 
-When `chromium` and `xvfb-run` are available, `check.sh` runs two Chromium suites through the DevTools protocol.
+When `chromium` is available, `check.sh` runs two headless Chromium suites through the DevTools protocol.
 
 `test_editor_regressions.js` is intentionally small and should be the first command used while debugging WYSIWYG/layout behavior. It verifies:
 

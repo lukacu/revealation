@@ -20,12 +20,12 @@ python3 tests/test_server.py
 python3 tests/test_pwa_build.py
 
 # Optional real-browser regressions. The core suite remains dependency-free;
-# contributors without Chromium/Xvfb still get all static/module/server checks.
-if command -v chromium >/dev/null 2>&1 && command -v xvfb-run >/dev/null 2>&1; then
+# contributors without Chromium still get all static/module/server checks.
+if command -v chromium >/dev/null 2>&1; then
   node tests/test_editor_regressions.js
   node tests/test_browser_regressions.js
 else
-  echo "browser regressions: SKIPPED (chromium/xvfb-run not available)"
+  echo "browser regressions: SKIPPED (chromium not available)"
 fi
 
 echo "Revealation checks: OK"

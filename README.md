@@ -140,8 +140,8 @@ Revealation has no mandatory development build system. Edit the source, reload t
 ./tests/check.sh
 ```
 
-The dependency-free checks always run. If `chromium` and `xvfb-run` are
-available, the command also runs the Chromium regression suites; otherwise
+The dependency-free checks always run. If `chromium` is available, the command
+also runs the headless Chromium regression suites; otherwise
 those browser tests are skipped. See [`docs/TESTING.md`](docs/TESTING.md) for
 the browser-test commands and prerequisites.
 

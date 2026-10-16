@@ -80,7 +80,7 @@ When extracting code from `core/application.js`, add a focused test or smoke ass
 The deck exporter is tested first as `Revealation.exporters.deck` with a small fake rendering adapter, then again through the real application adapter in Chromium. Keep both layers when changing HTML/ZIP packaging.
 ## Chromium regression checks
 
-On Linux systems with `chromium` and `xvfb-run`, `./tests/check.sh` additionally
+On systems with `chromium`, `./tests/check.sh` additionally
 runs two real-browser suites. For fast WYSIWYG/layout debugging, run only:
 
 ```bash

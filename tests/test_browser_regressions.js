@@ -19,8 +19,11 @@ const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), 'revealation-chrome-'));
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function assert(condition, message) { if (!condition) throw new Error(message); }
 
-async function waitForTarget() {
-  for (let i = 0; i < 80; i += 1) {
+async function waitForTarget(chrome, getStderr) {
+  for (let i = 0; i < 300; i += 1) {
+    if (chrome.exitCode !== null) {
+      throw new Error(`Chromium exited before its DevTools endpoint became ready (code ${chrome.exitCode}).${getStderr()}`);
+    }
     try {
       const response = await fetch(`http://127.0.0.1:${PORT}/json/list`);
       if (response.ok) {
@@ -31,18 +34,22 @@ async function waitForTarget() {
     } catch (_) {}
     await sleep(100);
   }
-  throw new Error('Chromium DevTools endpoint did not become ready.');
+  throw new Error(`Chromium DevTools endpoint did not become ready after 30 seconds.${getStderr()}`);
 }
 
 async function main() {
-  const chrome = spawn('xvfb-run', [
-    '-a', 'chromium', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+  const chrome = spawn('chromium', [
+    '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+    '--no-first-run', '--no-default-browser-check', '--remote-debugging-address=127.0.0.1',
     `--remote-debugging-port=${PORT}`, `--user-data-dir=${PROFILE}`, 'about:blank',
-  ], { stdio: 'ignore' });
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = '';
+  chrome.stderr.setEncoding('utf8');
+  chrome.stderr.on('data', chunk => { stderr += chunk; });
 
   let ws;
   try {
-    const endpoint = await waitForTarget();
+    const endpoint = await waitForTarget(chrome, () => stderr.trim() ? `\nChromium stderr:\n${stderr.trim()}` : '');
     ws = new WebSocket(endpoint);
     await new Promise((resolve, reject) => {
       ws.addEventListener('open', resolve, { once: true });
