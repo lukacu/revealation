@@ -63,9 +63,6 @@ For local development, use a temporary or scratch workspace:
 
 No Node.js, npm, database, or Python packages are required for normal local use.
 
-Neutralino support is currently parked locally under `.local/neutralino/` and
-is intentionally excluded from the repository while PWA support is the focus.
-
 Revealation can also be deployed as an installable static PWA. On supported Chromium-family browsers it opens a local presentation folder directly through the File System Access API; on other browsers it retains browser-storage fallback. The repository includes a GitHub Pages workflow for `main`. See [`docs/PWA_DEPLOYMENT.md`](docs/PWA_DEPLOYMENT.md).
 
 For the alpha release, Chromium-family browsers are preferred for local-folder
