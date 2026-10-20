@@ -274,7 +274,7 @@
 
 
 <div id="code-modal" class="modal tool-modal" hidden>
-  <div class="tool-card code-tool-card">
+  <div class="modal-card tool-card code-tool-card">
     <div class="modal-head">
       <strong>Code block</strong>
       <button type="button" id="code-close">Close</button>
@@ -305,7 +305,7 @@
 </div>
 
 <div id="math-modal" class="modal tool-modal" hidden>
-  <div class="tool-card math-tool-card">
+  <div class="modal-card tool-card math-tool-card">
     <div class="modal-head">
       <strong>LaTeX equation</strong>
       <button type="button" id="math-close">Close</button>
@@ -329,7 +329,7 @@
 </div>
 
 <div id="layout-modal" class="modal tool-modal" hidden>
-  <div class="tool-card layout-tool-card">
+  <div class="modal-card tool-card layout-tool-card">
     <div class="modal-head">
       <strong>Insert layout</strong>
       <button type="button" id="layout-close">Close</button>
@@ -342,7 +342,7 @@
 </div>
 
 <div id="background-modal" class="modal tool-modal" hidden>
-  <div class="tool-card background-tool-card">
+  <div class="modal-card tool-card background-tool-card">
     <div class="modal-head">
       <strong>Slide background</strong>
       <button type="button" id="background-close">Close</button>
@@ -357,7 +357,7 @@
 </div>
 
 <div id="interactive-modal" class="modal tool-modal" hidden>
-  <div class="tool-card interactive-tool-card">
+  <div class="modal-card tool-card interactive-tool-card">
     <div class="modal-head">
       <strong>Interactive</strong>
       <button type="button" id="interactive-close">Close</button>
@@ -388,7 +388,7 @@
 </div>
 
 <div id="workspace-picker-modal" class="modal settings-modal workspace-picker-modal" hidden>
-  <div class="settings-card workspace-picker-card">
+  <div class="modal-card settings-card workspace-picker-card">
     <div class="modal-head"><strong id="workspace-picker-title">Welcome to Revealation</strong></div>
     <div class="settings-body">
       <p id="workspace-picker-message" class="workspace-picker-message">Open a presentation folder to start creating, editing, and presenting.</p>
@@ -407,7 +407,7 @@
 </div>
 
 <div id="assets-modal" class="modal tool-modal" hidden>
-  <div class="tool-card assets-tool-card">
+  <div class="modal-card tool-card assets-tool-card">
     <div class="modal-head">
       <strong id="assets-title">Insert media</strong>
       <button type="button" id="assets-close">Close</button>
@@ -429,25 +429,27 @@
 </div>
 
 <div id="projects-modal" class="modal projects-modal" hidden>
-  <div class="modal-head">
-    <strong>Projects</strong>
-    <button type="button" id="projects-close">Close</button>
-  </div>
-  <div class="projects-body">
-    <div class="projects-toolbar">
-      <button type="button" id="projects-new">+ New project</button>
-      <button type="button" id="projects-export-all">Export presentation</button>
-      <label class="projects-import">
-        <span>Import presentation…</span>
-        <input id="projects-import-input" type="file" accept=".revealation,application/vnd.revealation.deck+zip" multiple hidden>
-      </label>
+  <div class="modal-card projects-card">
+    <div class="modal-head">
+      <strong>Projects</strong>
+      <button type="button" id="projects-close">Close</button>
     </div>
-    <ul id="projects-list" class="projects-list" aria-label="Saved projects"></ul>
+    <div class="projects-body">
+      <div class="projects-toolbar">
+        <button type="button" id="projects-new">+ New project</button>
+        <button type="button" id="projects-export-all">Export presentation</button>
+        <label class="projects-import">
+          <span>Import presentation…</span>
+          <input id="projects-import-input" type="file" accept=".revealation,application/vnd.revealation.deck+zip" multiple hidden>
+        </label>
+      </div>
+      <ul id="projects-list" class="projects-list" aria-label="Saved projects"></ul>
+    </div>
   </div>
 </div>
 
 <div id="settings-modal" class="modal settings-modal" hidden>
-  <div class="settings-card app-settings-card">
+  <div class="modal-card settings-card app-settings-card">
     <div class="modal-head">
       <strong>Application settings</strong>
       <button type="button" id="settings-close">Close</button>
@@ -470,7 +472,7 @@
 </div>
 
 <div id="about-modal" class="modal about-modal" hidden>
-  <div class="about-card">
+  <div class="modal-card about-card">
     <div class="modal-head">
       <strong id="about-title"></strong>
       <button type="button" id="about-close">Close</button>
@@ -480,7 +482,7 @@
 </div>
 
 <div id="deck-settings-modal" class="modal theme-modal" hidden>
-  <div class="theme-card deck-settings-card">
+  <div class="modal-card theme-card deck-settings-card">
     <div class="modal-head">
       <div>
         <strong>Deck settings</strong>
@@ -526,7 +528,7 @@
 </div>
 
 <div id="export-modal" class="modal settings-modal" hidden>
-  <div class="settings-card export-card">
+  <div class="modal-card settings-card export-card">
     <div class="modal-head">
       <strong>Export deck</strong>
       <button type="button" id="export-close">Close</button>
@@ -554,7 +556,7 @@
 </div>
 
 <div id="help-modal" class="modal settings-modal" hidden>
-  <div class="settings-card help-card">
+  <div class="modal-card settings-card help-card">
     <div class="modal-head">
       <strong>Help</strong>
       <button type="button" id="help-close">Close</button>

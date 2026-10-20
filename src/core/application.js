@@ -941,6 +941,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   let workspaceMonitorTimer = null;
   let workspaceMonitorBusy = false;
   let workspaceConflict = false;
+  let finishWorkspaceChoice = null;
 
 
   function activateWorkspace(adapter, info) {
@@ -992,6 +993,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     }
 
     els.workspacePickerModal.hidden = false;
+    focusModal(els.workspacePickerModal);
     els.workspacePickerChoose.hidden = !supported;
     els.workspacePickerCancel.hidden = !allowCancel;
     if (els.appLoadingScreen) els.appLoadingScreen.hidden = true;
@@ -1004,13 +1006,15 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       const finish = value => {
         if (finished) return;
         finished = true;
-        els.workspacePickerModal.hidden = true;
+        if (finishWorkspaceChoice === finish) finishWorkspaceChoice = null;
+        hideModal(els.workspacePickerModal);
         els.workspacePickerChoose.onclick = null;
         els.workspacePickerBrowser.onclick = null;
         els.workspacePickerCancel.onclick = null;
         els.workspacePickerRecent?.replaceChildren();
         resolve(value);
       };
+      finishWorkspaceChoice = finish;
 
       const renderRecent = () => {
         if (!els.workspacePickerRecent || !els.workspacePickerRecentSection) return;
@@ -3157,15 +3161,13 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     if (Array.from(els.codeLanguage.options).some(o => o.value === lang)) els.codeLanguage.value = lang;
     else els.codeLanguage.value = 'plaintext';
     els.codeInsert.textContent = existing ? 'Update code' : 'Insert code';
-    els.codeModal.hidden = false;
-    focusModal(els.codeModal);
+    showModal(els.codeModal);
     setTimeout(() => els.codeText.focus(), 0);
   }
 
   function closeCodeModal() {
-    els.codeModal.hidden = true;
+    hideModal(els.codeModal);
     editingCodeEl = null;
-    restoreModalFocus();
   }
 
   function commitCodeModal() {
@@ -3215,15 +3217,13 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     els.mathDisplay.value = existing && existing.dataset.display === '1' ? '1' : '0';
     els.mathInsert.textContent = existing ? 'Update equation' : 'Insert equation';
     renderMathDialogPreview();
-    els.mathModal.hidden = false;
-    focusModal(els.mathModal);
+    showModal(els.mathModal);
     setTimeout(() => els.mathText.focus(), 0);
   }
 
   function closeMathModal() {
-    els.mathModal.hidden = true;
+    hideModal(els.mathModal);
     editingMathEl = null;
-    restoreModalFocus();
   }
 
   function commitMathModal() {
@@ -3294,8 +3294,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     if (els.layoutTitle) {
       els.layoutTitle.textContent = pendingNewSlide ? 'Choose layout for new slide' : 'Insert layout';
     }
-    els.layoutModal.hidden = false;
-    focusModal(els.layoutModal);
+    showModal(els.layoutModal);
   }
 
   function openNewSlideLayoutModal({ atEnd = false } = {}) {
@@ -3305,19 +3304,16 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function closeLayoutModal() {
     pendingNewSlide = null;
-    els.layoutModal.hidden = true;
-    restoreModalFocus();
+    hideModal(els.layoutModal);
   }
 
   function openBackgroundModal() {
     renderBackgroundChoices();
-    els.backgroundModal.hidden = false;
-    focusModal(els.backgroundModal);
+    showModal(els.backgroundModal);
   }
 
   function closeBackgroundModal() {
-    els.backgroundModal.hidden = true;
-    restoreModalFocus();
+    hideModal(els.backgroundModal);
   }
 
   const isInteractiveElement = (el) => interactiveContent.isElement(el);
@@ -3376,17 +3372,15 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     els.interactiveModalBorder.checked = s ? s.border : false;
     els.interactiveModalScrollbars.checked = s ? s.scrollbars : false;
     els.interactiveInsert.textContent = (editingInteractiveEl || editingInteractiveMarkdownRange) ? 'Update interactive' : 'Insert interactive';
-    els.interactiveModal.hidden = false;
-    focusModal(els.interactiveModal);
+    showModal(els.interactiveModal);
     if (workspaceMode) refreshWorkspaceFiles().then(refreshInteractiveFileChoices);
     setTimeout(() => els.interactiveSrc.focus(), 0);
   }
 
   function closeInteractiveModal() {
-    els.interactiveModal.hidden = true;
+    hideModal(els.interactiveModal);
     editingInteractiveEl = null;
     editingInteractiveMarkdownRange = null;
-    restoreModalFocus();
   }
 
   const interactiveMarkdownBlock = (spec) => interactiveContent.toMarkdown(spec);
@@ -5479,14 +5473,12 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     }
     if (els.assetsSearch) els.assetsSearch.value = '';
     renderAssetsModal();
-    els.assetsModal.hidden = false;
-    focusModal(els.assetsModal);
+    showModal(els.assetsModal);
     if (workspaceMode) refreshWorkspaceFiles().then(renderAssetsModal);
   }
 
   function closeAssetsModal() {
-    els.assetsModal.hidden = true;
-    restoreModalFocus();
+    hideModal(els.assetsModal);
   }
 
   async function addFilesToAssetLibrary(files) {
@@ -7919,6 +7911,14 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     const target = modal.querySelector('button, input, select, textarea, a[href]');
     if (target) target.focus();
   }
+  function showModal(modal) {
+    modal.hidden = false;
+    focusModal(modal);
+  }
+  function hideModal(modal) {
+    modal.hidden = true;
+    restoreModalFocus();
+  }
   function restoreModalFocus() {
     if (modalReturnFocus && document.contains(modalReturnFocus)) modalReturnFocus.focus();
     modalReturnFocus = null;
@@ -7947,27 +7947,23 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function openDeckSettingsModal() {
     renderDeckSettings();
-    els.deckSettingsModal.hidden = false;
-    focusModal(els.deckSettingsModal);
+    showModal(els.deckSettingsModal);
   }
 
   function closeDeckSettingsModal() {
-    els.deckSettingsModal.hidden = true;
+    hideModal(els.deckSettingsModal);
     endTextEditSession();
-    restoreModalFocus();
   }
 
   function openSettingsModal() {
     syncUiThemeSettings();
     renderPresentationSettings();
-    els.settingsModal.hidden = false;
-    focusModal(els.settingsModal);
+    showModal(els.settingsModal);
   }
 
   function closeSettingsModal() {
-    els.settingsModal.hidden = true;
+    hideModal(els.settingsModal);
     endTextEditSession();
-    restoreModalFocus();
   }
 
   function openExportModal() {
@@ -7979,23 +7975,19 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       const hasInteractive = !!deckExporter?.containsInteractive?.(state);
       els.exportHtmlWarning.hidden = !hasInteractive;
     }
-    els.exportModal.hidden = false;
-    focusModal(els.exportModal);
+    showModal(els.exportModal);
   }
 
   function closeExportModal() {
-    els.exportModal.hidden = true;
-    restoreModalFocus();
+    hideModal(els.exportModal);
   }
 
   function openHelpModal() {
-    els.helpModal.hidden = false;
-    focusModal(els.helpModal);
+    showModal(els.helpModal);
   }
 
   function closeHelpModal() {
-    els.helpModal.hidden = true;
-    restoreModalFocus();
+    hideModal(els.helpModal);
   }
 
   const STYLE_MOTION_KEYS = ['transition', 'transitionSpeed', 'backgroundTransition'];
@@ -8118,13 +8110,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     captureCurrentContent();
     saveLibrary();
     renderProjectsList();
-    els.projectsModal.hidden = false;
-    focusModal(els.projectsModal);
+    showModal(els.projectsModal);
   }
 
   function closeProjectsModal() {
-    els.projectsModal.hidden = true;
-    restoreModalFocus();
+    hideModal(els.projectsModal);
   }
 
   // -------- Gist contents in Projects modal --------
@@ -9091,13 +9081,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   // -------- Sync modal --------
   function openSyncModal() {
     renderSyncModal();
-    els.syncModal.hidden = false;
-    focusModal(els.syncModal);
+    showModal(els.syncModal);
   }
 
   function closeSyncModal() {
-    els.syncModal.hidden = true;
-    restoreModalFocus();
+    hideModal(els.syncModal);
   }
 
   function renderSyncModal() {
@@ -9654,10 +9642,9 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       els.aboutBody.appendChild(details);
     }
     const openAboutModal = () => {
-      els.aboutModal.hidden = false;
-      focusModal(els.aboutModal);
+      showModal(els.aboutModal);
     };
-    const closeAboutModal = () => { els.aboutModal.hidden = true; restoreModalFocus(); };
+    const closeAboutModal = () => { hideModal(els.aboutModal); };
     renderAboutModal();
     els.appBrand.addEventListener('click', openAboutModal);
     els.aboutClose.addEventListener('click', closeAboutModal);
@@ -9738,6 +9725,36 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       els.projectsImportInput.value = '';
     });
 
+    // Modal Escape handling is centralized so newly added editor dialogs do
+    // not need another branch in the global shortcut list.
+    const closeWorkspacePicker = () => {
+      if (finishWorkspaceChoice) finishWorkspaceChoice(null);
+      else hideModal(els.workspacePickerModal);
+    };
+    const modalCloseHandlers = [
+      [els.presentModal, closePresentation],
+      [els.projectsModal, closeProjectsModal],
+      [els.deckSettingsModal, closeDeckSettingsModal],
+      [els.exportModal, closeExportModal],
+      [els.layoutModal, closeLayoutModal],
+      [els.settingsModal, closeSettingsModal],
+      [els.helpModal, closeHelpModal],
+      [els.aboutModal, () => hideModal(els.aboutModal)],
+      [els.codeModal, closeCodeModal],
+      [els.mathModal, closeMathModal],
+      [els.backgroundModal, closeBackgroundModal],
+      [els.interactiveModal, closeInteractiveModal],
+      [els.assetsModal, closeAssetsModal],
+      [els.workspacePickerModal, closeWorkspacePicker],
+      [els.syncModal, closeSyncModal],
+    ];
+    const closeActiveModal = () => {
+      const entry = modalCloseHandlers.find(([modal]) => modal && !modal.hidden);
+      if (!entry) return false;
+      entry[1]();
+      return true;
+    };
+
     // Keyboard shortcuts
     document.addEventListener('keydown', async (e) => {
       const mod = e.metaKey || e.ctrlKey;
@@ -9798,14 +9815,8 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       else if (e.key === 'Escape') {
         if (!els.toolbarMenu.hidden) closeToolbarMenu();
         else if (!els.slideMenu.hidden) hideSlideContextMenu();
-        else if (!els.presentModal.hidden) closePresentation();
-        else if (!els.projectsModal.hidden) closeProjectsModal();
-        else if (!els.deckSettingsModal.hidden) closeDeckSettingsModal();
-        else if (!els.exportModal.hidden) closeExportModal();
-        else if (!els.layoutModal.hidden) closeLayoutModal();
-        else if (!els.settingsModal.hidden) closeSettingsModal();
-        else if (!els.helpModal.hidden) closeHelpModal();
-        else if (!els.aboutModal.hidden) { els.aboutModal.hidden = true; restoreModalFocus(); }
+        else if (e.target.closest?.('dialog[open]')) return;
+        else if (closeActiveModal()) e.preventDefault();
         else if (markdownMode) await closeMarkdownMode();
         else if (isNotesPanelOpen()) closeNotesPanel();
         else if (isMobileLayerOpen()) closeMobileLayers();
