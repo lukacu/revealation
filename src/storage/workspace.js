@@ -29,6 +29,7 @@
  * GET  /api/deck
  * POST /api/deck
  * GET  /api/files
+ * GET  /api/workspace-state
  * POST /api/upload?name=...&subdir=...
  *
  * Public API
@@ -50,6 +51,11 @@
   }
 
   async function detect() {
+    // Static/PWA builds do not have an HTTP workspace endpoint. The build
+    // script marks those artifacts so GitHub Pages does not produce an
+    // expected-but-noisy 404 while probing for the Python backend.
+    if (global.REVEALATION_STATIC_DEPLOYMENT === true
+        || global.document?.documentElement?.dataset?.revealationStatic === 'true') return null;
     try {
       const response = await fetch('/api/workspace', { cache: 'no-store' });
       if (!response.ok) return null;
@@ -65,13 +71,28 @@
     return jsonResponse(response, 'Deck load');
   }
 
-  async function saveDeck(project, markdown) {
+  async function getWorkspaceState() {
+    const response = await fetch('/api/workspace-state', { cache: 'no-store' });
+    return jsonResponse(response, 'Workspace state');
+  }
+
+  async function saveDeck(project, markdown, { expectedRevision = null } = {}) {
     const response = await fetch('/api/deck', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project: metadataProject(project), markdown }),
+      body: JSON.stringify({ project: metadataProject(project), markdown, expectedRevision }),
     });
-    return jsonResponse(response, 'Deck save');
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 409) {
+      const error = new Error(data?.error || 'The presentation changed on disk.');
+      error.code = 'WORKSPACE_CONFLICT';
+      error.revision = data?.revision || null;
+      throw error;
+    }
+    if (!response.ok || data?.ok === false) {
+      throw new Error(data?.error || `Deck save failed (HTTP ${response.status})`);
+    }
+    return data;
   }
 
   async function listFiles() {
@@ -95,10 +116,10 @@
     return data.file;
   }
 
-  function saveBeacon(project) {
+  function saveBeacon(project, expectedRevision = null) {
     if (!project || !navigator.sendBeacon) return false;
     try {
-      const body = new Blob([JSON.stringify({ project: metadataProject(project) })], { type: 'application/json' });
+      const body = new Blob([JSON.stringify({ project: metadataProject(project), expectedRevision })], { type: 'application/json' });
       return navigator.sendBeacon('/api/deck', body);
     } catch (_) {
       return false;
@@ -117,5 +138,5 @@
     };
   }
 
-  app.storage.workspace = Object.freeze({ detect, loadDeck, saveDeck, listFiles, uploadFile, saveBeacon });
+  app.storage.workspace = Object.freeze({ detect, loadDeck, getWorkspaceState, saveDeck, listFiles, uploadFile, saveBeacon });
 })(window);

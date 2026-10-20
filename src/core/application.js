@@ -258,6 +258,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     wip: $('#slide-wip'),
     hiddenSlide: $('#slide-hidden'),
     status: $('#status'),
+    workspaceChangeBanner: $('#workspace-change-banner'),
+    workspaceChangeMessage: $('#workspace-change-message'),
+    workspaceChangeReload: $('#workspace-change-reload'),
+    workspaceChangeKeep: $('#workspace-change-keep'),
+    workspaceChangeExport: $('#workspace-change-export'),
     appLoadingScreen: $('#app-loading-screen'),
     saveIndicator: $('#save-indicator'),
     saveLabel: $('#save-label'),
@@ -931,6 +936,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   let workspaceInfo = null;
   let workspaceFiles = [];
   let workspaceLoadWarning = '';
+  let workspaceRevision = null;
+  let workspaceExternalRevision = null;
+  let workspaceMonitorTimer = null;
+  let workspaceMonitorBusy = false;
+  let workspaceConflict = false;
 
 
   function activateWorkspace(adapter, info) {
@@ -1118,6 +1128,133 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     }
   }
 
+  function revisionToken(revision, key) {
+    if (!revision) return '';
+    return String(revision[key] || '');
+  }
+
+  function localWorkspaceEditsPending() {
+    return !!(saveTimer != null
+      || (state && dirtyProjects.has(state.id))
+      || (markdownMode && els.markdownText && els.markdownText.value !== markdownBaseline));
+  }
+
+  function workspaceAssetUrl(value) {
+    const source = String(value || '');
+    if (!workspaceMode || !source || /^(?:data:|blob:|https?:|\/|#)/i.test(source)) return source;
+    const clean = source.split('#', 1)[0].split('?', 1)[0];
+    let lookup = clean;
+    try { lookup = decodeURIComponent(clean); } catch (_) {}
+    const file = workspaceFiles.find(item => item.path === clean || item.path === lookup);
+    if (!file) return source;
+    const revision = `${file.modifiedAt || 0}-${file.size || 0}`;
+    const hash = source.includes('#') ? `#${source.split('#').slice(1).join('#')}` : '';
+    return `${clean}?rv=${encodeURIComponent(revision)}${hash}`;
+  }
+
+  function refreshWorkspaceAssetUrls(root = els.editor) {
+    if (!workspaceMode || !root) return;
+    root.querySelectorAll?.('[src], [poster], [href]').forEach(node => {
+      for (const attribute of ['src', 'poster', 'href']) {
+        if (!node.hasAttribute(attribute)) continue;
+        const value = node.getAttribute(attribute) || '';
+        if (attribute === 'href' && !node.matches('a')) continue;
+        const next = workspaceAssetUrl(value);
+        if (next !== value) node.setAttribute(attribute, next);
+      }
+    });
+  }
+
+  function stripWorkspaceAssetRevisions(root) {
+    if (!workspaceMode || !root) return;
+    root.querySelectorAll?.('[src], [poster], [href]').forEach(node => {
+      for (const attribute of ['src', 'poster', 'href']) {
+        if (!node.hasAttribute(attribute)) continue;
+        const value = node.getAttribute(attribute) || '';
+        const hashIndex = value.indexOf('#');
+        const hash = hashIndex >= 0 ? value.slice(hashIndex) : '';
+        const withoutHash = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
+        const queryIndex = withoutHash.indexOf('?');
+        if (queryIndex < 0) continue;
+        const base = withoutHash.slice(0, queryIndex);
+        const params = new URLSearchParams(withoutHash.slice(queryIndex + 1));
+        if (!params.has('rv')) continue;
+        params.delete('rv');
+        node.setAttribute(attribute, `${base}${params.toString() ? `?${params}` : ''}${hash}`);
+      }
+    });
+  }
+
+  function showWorkspaceConflict(revision, message = 'This presentation changed on disk while you were editing it.') {
+    workspaceConflict = true;
+    workspaceExternalRevision = revision || workspaceExternalRevision;
+    if (els.workspaceChangeBanner) els.workspaceChangeBanner.hidden = false;
+    if (els.workspaceChangeMessage) els.workspaceChangeMessage.textContent = message;
+    setSaveState('error', 'Changed on disk');
+    setStatus('Save paused because the presentation changed on disk', false);
+  }
+
+  function hideWorkspaceConflict() {
+    workspaceConflict = false;
+    workspaceExternalRevision = null;
+    if (els.workspaceChangeBanner) els.workspaceChangeBanner.hidden = true;
+  }
+
+  async function reloadWorkspaceFromDisk() {
+    if (!workspaceMode || !workspaceStorage) return;
+    hideWorkspaceConflict();
+    if (saveTimer != null) { clearTimeout(saveTimer); saveTimer = null; }
+    library = await loadLibrary();
+    state = library.projects.find(p => p.id === library.currentProjectId) || library.projects[0];
+    dirtyProjects.clear();
+    metaDirty = false;
+    clearHistory();
+    renderAll();
+    setSaveState('saved', 'Reloaded from disk');
+    setStatus('Reloaded changes from disk', true);
+  }
+
+  async function checkWorkspaceChanges({ force = false } = {}) {
+    if (!workspaceMode || !workspaceStorage?.getWorkspaceState || workspaceMonitorBusy) return;
+    if (!force && document.visibilityState === 'hidden') return;
+    workspaceMonitorBusy = true;
+    try {
+      const current = await workspaceStorage.getWorkspaceState();
+      const nextRevision = current?.revision || null;
+      const oldDeck = revisionToken(workspaceRevision, 'deckToken');
+      const newDeck = revisionToken(nextRevision, 'deckToken');
+      const oldAssets = revisionToken(workspaceRevision, 'assetsToken');
+      const newAssets = revisionToken(nextRevision, 'assetsToken');
+      if (oldDeck && newDeck && oldDeck !== newDeck) {
+        workspaceExternalRevision = nextRevision;
+        if (localWorkspaceEditsPending()) showWorkspaceConflict(nextRevision);
+        else await reloadWorkspaceFromDisk();
+        return;
+      }
+      if (newAssets && oldAssets && newAssets !== oldAssets) {
+        workspaceFiles = Array.isArray(current.files) ? current.files : workspaceFiles;
+        workspaceRevision = nextRevision;
+        if (!sourceMode) {
+          refreshWorkspaceAssetUrls(els.editor);
+          scheduleIntrinsicSlideReflow();
+        }
+        if (els.assetsModal && !els.assetsModal.hidden) renderAssetsModal();
+      }
+    } catch (error) {
+      console.warn('Workspace change check failed', error);
+    } finally {
+      workspaceMonitorBusy = false;
+    }
+  }
+
+  function startWorkspaceMonitor() {
+    if (!workspaceMode || !workspaceStorage?.getWorkspaceState) return;
+    clearInterval(workspaceMonitorTimer);
+    workspaceMonitorTimer = setInterval(() => checkWorkspaceChanges(), 5000);
+    window.addEventListener('focus', () => checkWorkspaceChanges({ force: true }));
+    window.addEventListener('pageshow', () => checkWorkspaceChanges({ force: true }));
+  }
+
   async function uploadWorkspaceFile(file, subdir = 'assets') {
     if (!workspaceMode || !workspaceStorage || !file) return null;
     const item = await workspaceStorage.uploadFile(file, subdir);
@@ -1208,6 +1345,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
             : detail;
           console.warn('Workspace file read warnings:', data.errors);
         }
+        workspaceRevision = data?.revision || null;
         // Workspace contract: deck.md is the authoritative source of the
         // presentation whenever it exists and parses successfully. deck.json
         // carries project metadata and stable IDs; its mtime must never
@@ -1232,6 +1370,15 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
         // disk whenever the asset browser opens.
         p.assets = [];
         await refreshWorkspaceFiles();
+        if (workspaceStorage.getWorkspaceState) {
+          try {
+            const workspaceState = await workspaceStorage.getWorkspaceState();
+            workspaceRevision = workspaceState?.revision || workspaceRevision;
+            if (Array.isArray(workspaceState?.files)) workspaceFiles = workspaceState.files;
+          } catch (error) {
+            console.warn('Workspace revision could not be initialized', error);
+          }
+        }
         return { version: 1, currentProjectId: p.id, projects: [p], deletedIds: [] };
       } catch (e) {
         console.error('workspace deck load failed', e);
@@ -1354,9 +1501,10 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   }
 
   // Flush whatever's dirty to IndexedDB. Called by scheduleSave / saveProject.
-  async function flushDirty({ capture = true } = {}) {
+  async function flushDirty({ capture = true, expectedRevision = null } = {}) {
     if (workspaceMode) {
       if (!state) return true;
+      if (workspaceConflict && !expectedRevision) return false;
       try {
         // Markdown is authoritative while its editor is open. The WYSIWYG
         // editor remains hidden and may still contain a different slide than
@@ -1366,12 +1514,20 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
         if (typeof TurndownService !== 'undefined' && typeof marked !== 'undefined') {
           markdown = projectToMarkdown(state);
         }
-        await workspaceStorage.saveDeck(state, markdown);
+        const expected = expectedRevision || workspaceRevision?.deckToken || null;
+        const result = await workspaceStorage.saveDeck(state, markdown, { expectedRevision: expected });
+        workspaceRevision = result?.revision || workspaceRevision;
+        hideWorkspaceConflict();
         dirtyProjects.clear();
         metaDirty = false;
         setSaveState('saved', markdown == null ? 'Saved metadata to deck.json' : 'Saved to deck.md');
         return true;
       } catch (e) {
+        if (e?.code === 'WORKSPACE_CONFLICT') {
+          workspaceExternalRevision = e.revision?.revision || e.revision || workspaceExternalRevision;
+          showWorkspaceConflict(workspaceExternalRevision);
+          return false;
+        }
         setSaveState('error', 'Save failed: ' + (e.message || String(e)));
         setStatus('Save failed: ' + (e.message || String(e)), false);
         return false;
@@ -1857,6 +2013,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       els.source.value = slide.content;
     } else {
       els.editor.innerHTML = slide.content;
+      refreshWorkspaceAssetUrls(els.editor);
       decorateFragments();
       decorateRichContent();
       refreshCropGeometry(els.editor);
@@ -1915,7 +2072,8 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     if (type === 'color') {
       layer.style.background = value;
     } else if (type === 'image') {
-      const safe = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const safeValue = workspaceAssetUrl(value);
+      const safe = safeValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       layer.style.backgroundImage = `url("${safe}")`;
       if (size) layer.style.backgroundSize = size;
     } else {
@@ -2513,6 +2671,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function cleanLayoutHostContent(host) {
     const clone = host.cloneNode(true);
+    stripWorkspaceAssetRevisions(clone);
     undecorateRichContent(clone);
     // The cloned host itself is not structural data; only its inner HTML is
     // persisted. Normalize browser-generated paragraph wrappers locally so a
@@ -2638,6 +2797,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function cleanEditorClone(root) {
     const clone = root.cloneNode(true);
+    stripWorkspaceAssetRevisions(clone);
     clone.querySelectorAll('[data-fragment-label]').forEach(el => {
       el.removeAttribute('data-fragment-label');
     });
@@ -5269,11 +5429,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       const kind = assetKind(asset);
       let media;
       if (kind === 'image') {
-        media = document.createElement('img'); media.src = asset.dataUrl; media.alt = '';
+        media = document.createElement('img'); media.src = workspaceAssetUrl(asset.dataUrl || asset.path); media.alt = '';
       } else if (kind === 'video') {
-        media = document.createElement('video'); media.src = asset.dataUrl; media.muted = true;
+        media = document.createElement('video'); media.src = workspaceAssetUrl(asset.dataUrl || asset.path); media.muted = true;
       } else if (kind === 'audio') {
-        media = document.createElement('audio'); media.src = asset.dataUrl; media.controls = true;
+        media = document.createElement('audio'); media.src = workspaceAssetUrl(asset.dataUrl || asset.path); media.controls = true;
       } else {
         media = document.createElement('span'); media.textContent = 'file';
       }
@@ -9017,6 +9177,23 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   // -------- Wiring --------
   function wire() {
+    els.workspaceChangeReload?.addEventListener('click', () => {
+      reloadWorkspaceFromDisk().catch(error => {
+        setStatus('Could not reload the presentation: ' + (error.message || error), false);
+      });
+    });
+    els.workspaceChangeKeep?.addEventListener('click', async () => {
+      const revision = workspaceExternalRevision?.deckToken || workspaceRevision?.deckToken || null;
+      if (!revision) return;
+      captureCurrentContent();
+      if (state) markDirty(state.id);
+      setSaveState('saving', 'Overwriting…');
+      await flushDirty({ capture: false, expectedRevision: revision });
+    });
+    els.workspaceChangeExport?.addEventListener('click', async () => {
+      captureCurrentContent();
+      await exportPresentationZip(state);
+    });
     els.themeSelect.addEventListener('change', () => {
       selectPresentationTheme(els.themeSelect.value);
     });
@@ -9328,7 +9505,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       renderSidebar();
       scheduleSave();
     });
-    els.fileInput.addEventListener('change', () => {
+    els.fileInput?.addEventListener('change', () => {
       const file = els.fileInput.files && els.fileInput.files[0];
       const linkHref = els.fileInput.dataset.linkHref || null;
       delete els.fileInput.dataset.linkHref;
@@ -9699,7 +9876,10 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     // write, and a hidden-but-alive tab still completes fetches, so the
     // debounced gist push gets its chance to run instead of being dropped.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'hidden') return;
+      if (document.visibilityState !== 'hidden') {
+        checkWorkspaceChanges({ force: true });
+        return;
+      }
       if (saveTimer != null) {
         clearTimeout(saveTimer);
         saveTimer = null;
@@ -9713,7 +9893,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       if (saveTimer != null) {
         captureCurrentContent();
         if (workspaceMode && state && workspaceStorage?.saveBeacon) {
-          workspaceStorage.saveBeacon(state);
+          workspaceStorage.saveBeacon(state, workspaceRevision?.deckToken || null);
         } else saveProject();
       }
     });
@@ -9751,4 +9931,5 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   document.body.classList.remove('app-starting');
   if (els.appLoadingScreen) els.appLoadingScreen.hidden = true;
   setStatus(workspaceLoadWarning || (workspaceMode ? `Ready · ${workspaceInfo?.name || 'workspace'}` : 'Ready'), !workspaceLoadWarning);
+  startWorkspaceMonitor();
 })();

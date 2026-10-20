@@ -10,7 +10,10 @@ mkdir -p "$DIST/__app__"
 
 # Root deployment shell. Presentation-relative paths intentionally remain free
 # for the directory workspace and are served by the service worker.
-cp index.html manifest.webmanifest "$DIST/"
+# Mark the generated artifact so the runtime skips the Python-only
+# /api/workspace probe on static hosts such as GitHub Pages.
+sed 's/data-revealation-static="false"/data-revealation-static="true"/' index.html > "$DIST/index.html"
+cp manifest.webmanifest "$DIST/"
 touch "$DIST/.nojekyll"
 
 # App resources are namespaced exactly like the Python workspace server.

@@ -15,5 +15,11 @@ Persistence mechanics live under `src/storage/`.
 
 GitHub Gist is currently synchronization, not the primary local storage backend.
 
+Filesystem adapters also expose a lightweight workspace revision. Deck files
+are protected with compare-before-save semantics, and asset revisions are
+based on path, size and modification time. The editor polls these revisions
+while visible, reloads clean decks automatically, pauses dirty saves on a
+conflict, and adds a runtime cache-busting revision to changed workspace media.
+
 ## Consequences
 New storage modes should expose persistence primitives instead of requiring UI/editor code to know backend details.

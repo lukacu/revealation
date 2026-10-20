@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import threading
+import urllib.error
 import urllib.request
 
 import sys
@@ -78,6 +79,23 @@ def main() -> None:
             assert deck["project"]["name"] == "Smoke"
             assert deck["markdown"] == saved_markdown
             assert deck["markdownPreferred"] is True
+            state = request_json(base + "/api/workspace-state")
+            assert state["revision"]["deckToken"] == deck["revision"]["deckToken"]
+            (workspace / "deck.md").write_text("# Changed externally\n", encoding="utf-8")
+            try:
+                request_json(
+                    base + "/api/deck",
+                    method="POST",
+                    payload={
+                        "project": {"id": "smoke", "name": "Stale", "slides": []},
+                        "markdown": saved_markdown,
+                        "expectedRevision": deck["revision"]["deckToken"],
+                    },
+                )
+                raise AssertionError("stale workspace save was accepted")
+            except urllib.error.HTTPError as error:
+                assert error.code == 409
+            (workspace / "deck.md").write_text(saved_markdown, encoding="utf-8")
 
             # deck.md is authoritative even when deck.json happens to have a
             # newer mtime (for example after metadata-only/cache activity).

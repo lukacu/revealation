@@ -9,7 +9,8 @@ Conceptually, a storage backend may provide operations such as:
 ```text
 detect?()
 loadDeck()
-saveDeck(project, markdown)
+getWorkspaceState?()
+saveDeck(project, markdown, { expectedRevision })
 listFiles?()
 uploadFile?(file, subdir)
 readFile?(path)
@@ -26,5 +27,12 @@ Core code remains responsible for:
 - save timing;
 - Markdown serialization;
 - current-project/library policy.
+
+Filesystem adapters may return a revision with `deckToken` and `assetsToken`.
+The editor keeps the loaded `deckToken` and passes it back to `saveDeck()`;
+the backend must reject a stale write with `code = WORKSPACE_CONFLICT` (the
+Python backend uses HTTP 409, while the directory adapter performs the same
+check immediately before writing). Asset revisions are metadata-only snapshots
+used to refresh externally changed media without rewriting Markdown.
 
 GitHub Gist is currently treated as **synchronization**, not the primary local storage backend. If it later becomes a true storage mode, it should move behind this same boundary.

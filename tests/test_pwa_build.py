@@ -60,6 +60,9 @@ def main() -> None:
         assert version["commit"] == env["GITHUB_SHA"]
         assert version["version"]
 
+        index = (dist / "index.html").read_text("utf-8")
+        assert 'data-revealation-static="true"' in index
+
         sw = (dist / "sw.js").read_text("utf-8")
         assert "__BUILD_ID__" not in sw
         assert "pwa-smoke-build" in sw
@@ -88,7 +91,7 @@ def main() -> None:
         assert not any(path.startswith("assets/") or path.startswith("interactive/") for path in precache)
 
         parser = ResourceParser()
-        parser.feed((dist / "index.html").read_text("utf-8"))
+        parser.feed(index)
         local_urls = [url for url in parser.urls if not url.startswith(("http:", "https:", "data:"))]
         assert local_urls
         assert all(not url.startswith("/") for url in local_urls), "deployment contains root-absolute app URLs"

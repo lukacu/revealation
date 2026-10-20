@@ -353,17 +353,38 @@
     }
   }
 
+  function revisionToken(value) {
+    return `v1:${JSON.stringify(value)}`;
+  }
+
+  async function deckRevision() {
+    const entries = {};
+    for (const name of [DECK_FILENAME, DECK_MD_FILENAME]) {
+      try {
+        const file = await readFile(name);
+        entries[name] = { exists: true, size: file.size, modifiedAt: Number(file.lastModified || 0) * 1e6 };
+      } catch (error) {
+        if (error?.name === 'NotFoundError') entries[name] = { exists: false };
+        else throw error;
+      }
+    }
+    return revisionToken(entries);
+  }
+
   async function loadDeck() {
     let project = null;
     let markdown = null;
     let markdownExists = false;
     let jsonMtimeNs = 0;
     let markdownMtimeNs = 0;
+    let jsonSize = 0;
+    let markdownSize = 0;
     const errors = [];
 
     try {
       const file = await readFile(DECK_FILENAME);
       jsonMtimeNs = Number(file.lastModified || 0) * 1e6;
+      jsonSize = file.size;
       project = JSON.parse(await file.text());
     } catch (error) {
       if (error?.name !== 'NotFoundError') errors.push(`Cannot read ${DECK_FILENAME}: ${error.message || error}`);
@@ -373,6 +394,7 @@
       const file = await readFile(DECK_MD_FILENAME);
       markdownExists = true;
       markdownMtimeNs = Number(file.lastModified || 0) * 1e6;
+      markdownSize = file.size;
       markdown = await file.text();
     } catch (error) {
       if (error?.name !== 'NotFoundError') errors.push(`Cannot read ${DECK_MD_FILENAME}: ${error.message || error}`);
@@ -387,6 +409,10 @@
       metadataNewer: !!(jsonMtimeNs && markdownMtimeNs && jsonMtimeNs > markdownMtimeNs),
       jsonMtimeNs,
       markdownMtimeNs,
+      revision: { deckToken: revisionToken({
+        [DECK_FILENAME]: project === null ? { exists: false } : { exists: true, size: jsonSize, modifiedAt: jsonMtimeNs },
+        [DECK_MD_FILENAME]: markdownExists ? { exists: true, size: markdownSize, modifiedAt: markdownMtimeNs } : { exists: false },
+      }) },
       errors,
     };
   }
@@ -400,14 +426,45 @@
     };
   }
 
-  async function saveDeck(project, markdown) {
+  async function getWorkspaceState() {
+    const files = await listFiles();
+    return {
+      ok: true,
+      revision: {
+        deckToken: await deckRevision(),
+        assetsToken: revisionToken(files.map(file => ({
+          path: file.path,
+          size: file.size,
+          modifiedAt: file.modifiedAt || 0,
+        }))),
+      },
+      files,
+    };
+  }
+
+  async function saveDeck(project, markdown, { expectedRevision = null } = {}) {
     // Snapshot the destination before the first await. This matters when the
     // user opens the Change folder picker while a final save is in flight:
     // that save must finish in the old workspace even if the picker resolves.
     const root = requireHandle();
+    const expectedToken = expectedRevision?.deckToken || expectedRevision || null;
+    if (expectedToken) {
+      const currentToken = await deckRevision();
+      if (currentToken !== expectedToken) {
+        const error = new Error('The presentation changed on disk.');
+        error.code = 'WORKSPACE_CONFLICT';
+        error.revision = await getWorkspaceState();
+        throw error;
+      }
+    }
     await writeFile(DECK_FILENAME, JSON.stringify(metadataProject(project), null, 2), root);
     if (typeof markdown === 'string') await writeFile(DECK_MD_FILENAME, markdown, root);
-    return { ok: true, deckFile: DECK_MD_FILENAME, metadataFile: DECK_FILENAME };
+    return {
+      ok: true,
+      deckFile: DECK_MD_FILENAME,
+      metadataFile: DECK_FILENAME,
+      revision: (await getWorkspaceState()).revision,
+    };
   }
 
   function inferMime(name, fallback = '') {
@@ -524,6 +581,7 @@
     forget,
     removeRecent,
     loadDeck,
+    getWorkspaceState,
     saveDeck,
     listFiles,
     uploadFile,

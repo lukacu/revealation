@@ -6,7 +6,7 @@
   Behavior belongs under src/; styling belongs under styles/. Button order is
   configured in src/config rather than by rearranging behavior code here.
 -->
-<html lang="en">
+<html lang="en" data-revealation-static="false">
 <head>
 <meta charset="utf-8">
 <!-- CSP must be the first non-charset element in <head> so it applies to all
@@ -69,6 +69,12 @@
   </div>
 </header>
 <div id="status" class="app-status-toast" role="status" aria-live="polite" hidden></div>
+<div id="workspace-change-banner" class="workspace-change-banner" role="alert" aria-live="assertive" hidden>
+  <span id="workspace-change-message">This presentation changed on disk.</span>
+  <button id="workspace-change-reload" type="button">Reload from disk</button>
+  <button id="workspace-change-keep" type="button">Keep my version</button>
+  <button id="workspace-change-export" type="button">Export local copy</button>
+</div>
 <div id="pwa-update-banner" class="pwa-update-banner" role="status" aria-live="polite" hidden>
   <span>A new Revealation version is available.</span>
   <button id="pwa-update-now" type="button">Update now</button>

@@ -36,6 +36,8 @@ import mimetypes
 import os
 import re
 import sys
+import hashlib
+import threading
 import urllib.parse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -89,6 +91,7 @@ class WorkspaceServer(ThreadingHTTPServer):
     def __init__(self, addr, handler, project_root: Path):
         super().__init__(addr, handler)
         self.project_root = project_root.resolve()
+        self.save_lock = threading.RLock()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -246,6 +249,41 @@ class Handler(BaseHTTPRequestHandler):
         result.sort(key=lambda x: x["path"].lower())
         return result
 
+    @staticmethod
+    def _revision_token(value) -> str:
+        raw = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
+
+    def _deck_revision(self):
+        entries = {}
+        for name, path in ((DECK_FILENAME, self.deck_path), (DECK_MD_FILENAME, self.deck_md_path)):
+            try:
+                stat = path.stat()
+                entries[name] = {
+                    "exists": True,
+                    "size": stat.st_size,
+                    "mtimeNs": stat.st_mtime_ns,
+                    "inode": getattr(stat, "st_ino", 0),
+                }
+            except FileNotFoundError:
+                entries[name] = {"exists": False}
+        return self._revision_token(entries)
+
+    def _assets_revision(self, files=None):
+        files = self._workspace_files() if files is None else files
+        entries = [
+            {"path": item["path"], "size": item["size"], "modifiedAt": item["modifiedAt"]}
+            for item in files
+        ]
+        return self._revision_token(entries)
+
+    def _workspace_revision(self, files=None):
+        files = self._workspace_files() if files is None else files
+        return {
+            "deckToken": self._deck_revision(),
+            "assetsToken": self._assets_revision(files),
+        }
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
@@ -286,7 +324,15 @@ class Handler(BaseHTTPRequestHandler):
                 "metadataNewer": bool(self.deck_path.exists() and self.deck_md_path.exists() and json_mtime > md_mtime),
                 "jsonMtimeNs": json_mtime,
                 "markdownMtimeNs": md_mtime,
+                "revision": self._workspace_revision(),
                 "errors": errors,
+            })
+        if path == "/api/workspace-state":
+            files = self._workspace_files()
+            return self._json(HTTPStatus.OK, {
+                "ok": True,
+                "revision": self._workspace_revision(files),
+                "files": files,
             })
         if path == "/api/files":
             return self._json(HTTPStatus.OK, {"files": self._workspace_files()})
@@ -344,22 +390,33 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self._read_json()
                 project = payload.get("project", payload)
                 markdown = payload.get("markdown") if isinstance(payload, dict) else None
+                expected_revision = payload.get("expectedRevision") if isinstance(payload, dict) else None
                 if not isinstance(project, dict):
                     raise ValueError("project must be a JSON object")
                 if markdown is not None and not isinstance(markdown, str):
                     raise ValueError("markdown must be a string")
-                self.project_root.mkdir(parents=True, exist_ok=True)
-                tmp = self.deck_path.with_name(DECK_FILENAME + ".tmp")
-                tmp.write_bytes(json_bytes(project))
-                tmp.replace(self.deck_path)
-                if markdown is not None:
-                    md_tmp = self.deck_md_path.with_name(DECK_MD_FILENAME + ".tmp")
-                    md_tmp.write_text(markdown, encoding="utf-8")
-                    md_tmp.replace(self.deck_md_path)
+                expected_token = expected_revision.get("deckToken") if isinstance(expected_revision, dict) else expected_revision
+                with self.server.save_lock:  # type: ignore[attr-defined]
+                    current_token = self._deck_revision()
+                    if expected_token and expected_token != current_token:
+                        return self._json(HTTPStatus.CONFLICT, {
+                            "ok": False,
+                            "error": "The presentation changed on disk.",
+                            "revision": self._workspace_revision(),
+                        })
+                    self.project_root.mkdir(parents=True, exist_ok=True)
+                    tmp = self.deck_path.with_name(DECK_FILENAME + ".tmp")
+                    tmp.write_bytes(json_bytes(project))
+                    tmp.replace(self.deck_path)
+                    if markdown is not None:
+                        md_tmp = self.deck_md_path.with_name(DECK_MD_FILENAME + ".tmp")
+                        md_tmp.write_text(markdown, encoding="utf-8")
+                        md_tmp.replace(self.deck_md_path)
                 return self._json(HTTPStatus.OK, {
                     "ok": True,
                     "deckFile": DECK_MD_FILENAME,
                     "metadataFile": DECK_FILENAME,
+                    "revision": self._workspace_revision(),
                 })
             except Exception as exc:
                 return self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)})
