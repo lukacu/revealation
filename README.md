@@ -9,7 +9,7 @@
 Create, edit, present, and export technical presentations from a Git-friendly workspace. Bring your ideas, your Markdown, and perhaps a comforting beverage.
 
 [![MIT License](https://img.shields.io/badge/license-MIT-2563eb?style=flat-square)](LICENSE)
-
+[![Online version](https://img.shields.io/badge/online-PWA-2563eb?style=flat-square)](https://lukacu.github.io/revealation/)
 
 [Quick start](#quick-start) · [Features](#features) · [Documentation](#documentation) · [Development](#development-and-testing)
 
