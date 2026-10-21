@@ -6571,7 +6571,16 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
         if (!allowedAttrs(node, inPre ? ['class', 'data-trim'] : [])) {
           throw markdownConversionError(node, 'Unexpected code attribute.');
         }
-        if (inPre && node.className && !/^language-[^\s]+$/.test(node.className)) throw markdownConversionError(node, 'Unsupported code language class.');
+        if (inPre) {
+          // Highlight.js decorates authored code as `language-text hljs` while
+          // it is mounted in the editor. `hljs` is transient presentation
+          // state; the language-* token remains the only authored language
+          // identity used by the Markdown writer.
+          const classes = Array.from(node.classList || []);
+          const languages = classes.filter(name => /^language-[^\s]+$/.test(name));
+          const unsupported = classes.some(name => name !== 'hljs' && !/^language-[^\s]+$/.test(name));
+          if (unsupported || languages.length > 1) throw markdownConversionError(node, 'Unsupported code language class.');
+        }
       } else if (['STRONG','EM','BR','HR'].includes(node.nodeName)) {
         if (node.attributes.length) throw markdownConversionError(node, 'Unexpected attribute.');
       } else if (node.nodeName === 'SPAN') {
@@ -6792,6 +6801,18 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     return false;
   }
 
+  // Code syntax highlighters may leave presentation classes on persisted
+  // editor HTML. The language-* token is the only code class with Markdown
+  // meaning; canonicalize the rest before the safety validator and Turndown
+  // inspect the node.
+  function normalizeMarkdownCodeClasses(root) {
+    root.querySelectorAll('pre > code').forEach(code => {
+      const language = Array.from(code.classList || []).find(name => /^language-[a-z0-9_+-]+$/i.test(name));
+      if (language) code.className = language.toLowerCase();
+      else code.removeAttribute('class');
+    });
+  }
+
   // Stamp a marker into a detached copy of the slide so legacy classes survive
   // turndown and can be re-emitted as an .element comment afterwards. Semantic
   // block styles have proper directive syntax and are handled by a Turndown
@@ -6821,6 +6842,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     // Also canonicalize old/browser-generated editable wrappers here so
     // non-current slides and imported decks receive the same safe round-trip.
     contentNormalization?.normalizeForSerialization(holder, { includeRoot: false });
+    normalizeMarkdownCodeClasses(holder);
     assertSingleLayoutDom(holder);
     assertMarkdownConvertible(holder);
     mdStampClasses(holder);

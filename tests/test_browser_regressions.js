@@ -740,6 +740,151 @@ async function main() {
     assert(modelRoundTrip.markdown.includes('--- layout=header-body'), 'header-body metadata was lost during model round-trip');
     assert(modelRoundTrip.markdown.includes('::: block'), 'positional blocks were lost during model round-trip');
 
+    // Compatibility fixture with intentionally generic content. It deliberately
+    // combines the layout's three positional blocks with fenced
+    // text code, inline math, ordered/unordered lists and inline emphasis.
+    // The contract is semantic: Markdown whitespace may be normalized, but
+    // these authored structures must remain available after a full
+    // Markdown -> model -> Markdown -> model round trip.
+    const layoutContentRoundTrip = await evaluate(`(() => {
+      const slash = String.fromCharCode(92);
+      const source = [
+        '--- layout=header-two-columns',
+        '',
+        '::: block',
+        '# Example title',
+        ':::',
+        '',
+        '::: block',
+        'Sample text ' + slash + '(x' + slash + '), with \`one\` and \`zero\` markers.',
+        '',
+        '\`\`\`text',
+        'alpha beta gamma',
+        'delta epsilon zeta',
+        'eta theta iota',
+        'kappa lambda mu',
+        'nu xi omicron',
+        'pi rho sigma',
+        'tau upsilon phi',
+        '\`\`\`',
+        '',
+        'Another sample ' + slash + '(y' + slash + ') value:',
+        '',
+        '\`\`\`text',
+        'red green blue',
+        'cyan magenta yellow',
+        'black white gray',
+        '\`\`\`',
+        ':::',
+        '',
+        '::: block',
+        '',
+        '**Tasks:**',
+        '',
+        '1. Transform ' + slash + '(x ' + slash + 'ominus y' + slash + ')',
+        '2. Compare ' + slash + '(x ' + slash + 'oplus y' + slash + ')',
+        '',
+        '**Questions:**',
+        '',
+        '- Which value changes first?',
+        '- What remains after the operation?',
+        '- Which structure is preserved?',
+        '',
+        '*Note:* outside values are \`zero\`, and the reference point is centered.',
+        ':::'
+      ].join('\\n');
+
+      const summarize = slide => slide.blocks.map(block => {
+        const holder = document.createElement('div');
+        holder.innerHTML = block.html;
+        return {
+          heading: holder.querySelector('h1')?.textContent.trim() || '',
+          code: holder.querySelector('pre code')?.textContent || '',
+          codeLanguage: holder.querySelector('pre code')?.className || '',
+          math: Array.from(holder.querySelectorAll('.sr-math')).map(node => node.getAttribute('data-tex') || ''),
+          ordered: Array.from(holder.querySelectorAll(':scope > ol > li')).map(node => node.textContent.trim()),
+          unordered: Array.from(holder.querySelectorAll(':scope > ul > li')).map(node => node.textContent.trim()),
+          emphasis: holder.querySelector('em')?.textContent.trim() || '',
+        };
+      });
+
+      let error = '', markdown = '', first = [], second = [];
+      try {
+        first = __revealationRegression.parseMarkdownDeck(source);
+        markdown = __revealationRegression.projectToMarkdown({ slides: first, title: 'Example' });
+        second = __revealationRegression.parseMarkdownDeck(markdown);
+      } catch (e) {
+        error = e.message || String(e);
+      }
+      return {
+        error,
+        markdown,
+        sourceSlides: first.length,
+        reparsedSlides: second.length,
+        firstLayout: first[0]?.layout || '',
+        secondLayout: second[0]?.layout || '',
+        firstBlocks: first[0] ? summarize(first[0]) : [],
+        secondBlocks: second[0] ? summarize(second[0]) : [],
+      };
+    })()`);
+    assert(!layoutContentRoundTrip.error,
+      `generic layout compatibility fixture failed to round-trip: ${layoutContentRoundTrip.error}`);
+    assert(layoutContentRoundTrip.sourceSlides === 1 && layoutContentRoundTrip.reparsedSlides === 1,
+      'generic layout fixture changed its slide count');
+    assert(layoutContentRoundTrip.firstLayout === 'header-two-columns'
+      && layoutContentRoundTrip.secondLayout === 'header-two-columns',
+      'header-two-columns layout metadata was not preserved');
+    assert(layoutContentRoundTrip.firstBlocks.length === 3
+      && layoutContentRoundTrip.secondBlocks.length === 3,
+      'header-two-columns positional block count was not preserved');
+    assert(JSON.stringify(layoutContentRoundTrip.firstBlocks)
+      === JSON.stringify(layoutContentRoundTrip.secondBlocks),
+      `generic layout block semantics changed during round trip: ${JSON.stringify(layoutContentRoundTrip)}`);
+    assert(layoutContentRoundTrip.firstBlocks[1].codeLanguage === 'language-text'
+      && layoutContentRoundTrip.firstBlocks[1].code.includes('delta epsilon zeta'),
+      'generic fenced code lost its language or content');
+    assert(layoutContentRoundTrip.firstBlocks[0].heading === 'Example title'
+      && JSON.stringify(layoutContentRoundTrip.firstBlocks[1].math) === JSON.stringify(['x', 'y'])
+      && JSON.stringify(layoutContentRoundTrip.firstBlocks[2].math) === JSON.stringify(['x \\ominus y', 'x \\oplus y']),
+      'heading or inline TeX source was not materialized correctly');
+    assert(layoutContentRoundTrip.firstBlocks[2].ordered.length === 2
+      && layoutContentRoundTrip.firstBlocks[2].unordered.length === 3
+      && layoutContentRoundTrip.firstBlocks[2].emphasis === 'Note:',
+      'generic lists or note emphasis were not materialized semantically');
+    assert(layoutContentRoundTrip.markdown.includes('--- layout=header-two-columns')
+      && layoutContentRoundTrip.markdown.includes('```text')
+      && layoutContentRoundTrip.markdown.includes('\\(x\\)')
+      && layoutContentRoundTrip.markdown.includes('\\(x \\ominus y\\)')
+      && layoutContentRoundTrip.markdown.includes('\\(x \\oplus y\\)'),
+      'canonical layout, fenced code or inline math syntax was not emitted');
+
+    // Highlight.js adds the transient `hljs` class to code in the viewer.
+    // Saving a layout must still accept that decorated DOM and serialize only
+    // the authored language token back to a fenced Markdown block.
+    const highlightedLayoutCode = await evaluate(`(() => {
+      const blocks = [
+        { html: '<h1>Code</h1>', align: 'left' },
+        { html: '<pre class="sr-code"><code class="language-text hljs syntax-highlighted">0 1 0\\n1 1 1\\n0 1 0</code></pre>', align: 'left' },
+        { html: '<p>Questions</p>', align: 'left' },
+      ];
+      const slide = {
+        id: 'highlighted-layout-code', content: '', notes: '', transition: '',
+        background: { id: '' }, vertical: false, layout: 'header-two-columns', blocks,
+      };
+      const wrap = Revealation.layout.blocks.createElementFromHtml(slide.layout, blocks);
+      slide.content = wrap.outerHTML;
+      let markdown = '', error = '';
+      try { markdown = __revealationRegression.projectToMarkdown({ slides: [slide], title: 'Code' }); }
+      catch (e) { error = e.message || String(e); }
+      return { markdown, error };
+    })()`);
+    assert(!highlightedLayoutCode.error,
+      `viewer-highlighted code prevented layout save: ${highlightedLayoutCode.error}`);
+    assert(highlightedLayoutCode.markdown.includes('```text')
+      && highlightedLayoutCode.markdown.includes('0 1 0\n1 1 1\n0 1 0')
+      && !highlightedLayoutCode.markdown.includes('hljs'),
+      `highlight.js presentation class leaked into Markdown: ${highlightedLayoutCode.markdown}`);
+
     // Parser coverage for the supported content families in one realistic
     // slide: formatting, lists, links, image sizing, math, code, fragments,
     // animation, alignment, audio, video and interactive directives.
