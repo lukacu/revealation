@@ -40,7 +40,7 @@ const window = {
 };
 window.window = window;
 const navigator = {};
-const context = { window, navigator, console, URL, Math, Date, setTimeout };
+const context = { window, navigator, console, URL, Math, Date, setTimeout, clearTimeout };
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/core/revealation.js'), 'utf8'), context);
 window.Revealation.storage.createIndexedDbStore = () => fakeStore;

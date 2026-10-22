@@ -40,8 +40,6 @@ When the compatibility cleanup is complete, that command should return no implem
 | `editor-sizing-artifacts` | Strips old editor-generated `r-fit-text` / `r-stretch` sizing artifacts on load. | Delete migration after internal decks have been resaved. |
 | `align-shorthand` | Accepts old `::: center`, `::: left`, `::: right` and `.sr-center`. | Keep only canonical `::: align <direction>` / `.sr-align-*`. |
 | `serialized-math-span` | Recovers old Markdown that accidentally persisted generated `.sr-math` HTML instead of LaTeX delimiters. | Delete recovery conversion and its regression fixtures. |
-| `html-source-mode` | Keeps commit logic for the removed/hidden raw HTML source editor. | Delete the dormant source-mode path once no internal workflow depends on it. |
-| `save-api-shim` | Keeps the old synchronous `saveProject()` / `saveLibrary()` call surface routed through dirty tracking. | Update remaining callers to the storage API and remove the shim. |
 | `reveal-config-fields` | Preserves unknown/retired project-level Reveal config keys from older internal decks. Supported navigation, Present and playback settings are current features. | Stop round-tripping keys outside the documented supported config set. |
 | `preview-protocol` | Keeps historic preview/PDF storage/message identifiers so already-open tabs from an older internal build continue to work. | Rename protocol/storage identifiers together and remove the old-key comments/tests. |
 
@@ -50,7 +48,7 @@ When the compatibility cleanup is complete, that command should return no implem
 1. Resave any internal decks worth keeping in the latest canonical format.
 2. Remove parser/import-only items first (`layout-wrapper`, `layout-html-cache`, `columns-directive`, `interactive-demo`, `serialized-math-span`, `align-shorthand`).
 3. Remove old presentation model fields (`theme-custom`, `background-reveal`, `slide-transition`, `subslide-vertical`, `reveal-config-fields`).
-4. Remove browser/internal API migrations (`storage-old-keys`, `save-api-shim`, `preview-protocol`, `html-source-mode`).
+4. Remove browser/internal API migrations (`storage-old-keys`, `preview-protocol`).
 5. Remove migration-only content cleanup (`video-html-autoplay`, `editor-sizing-artifacts`).
 6. Run the full suite and the audit command above; there should be no `RV-COMPAT(...)` markers left.
 

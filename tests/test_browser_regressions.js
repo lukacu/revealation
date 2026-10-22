@@ -1715,16 +1715,6 @@ async function main() {
       'advanced/recovery/project actions leaked back into the main toolbar');
     assert(visualControlsUi.forbidden.length === 0, `arbitrary visual controls remain in normal UI: ${visualControlsUi.forbidden.join(', ')}`);
 
-    // RV-COMPAT(html-source-mode): REMOVE this test with the dormant source path BEFORE PUBLIC RELEASE.
-    // Direct per-slide HTML source editing is intentionally not exposed in
-    // the UI. The dormant control remains only as an internal compatibility
-    // hook for old code paths.
-    const htmlSourceUi = await evaluate(`(() => ({
-      hidden: !document.getElementById('toggle-source') || document.getElementById('toggle-source').hidden === true,
-      toolbarContains: !!document.querySelector('#toolbar #toggle-source:not([hidden])'),
-    }))()`);
-    assert(htmlSourceUi.hidden && !htmlSourceUi.toolbarContains, 'direct HTML source editor is still exposed in the toolbar');
-
     // Present runtime regression: preview.html receives its payload after the
     // shell has loaded. Theme CSS therefore arrives dynamically and Reveal must
     // not initialize until that stylesheet has fired `load`. This reproduces

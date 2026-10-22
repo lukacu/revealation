@@ -45,8 +45,28 @@
   // RV-COMPAT(theme-reveal-aliases): REMOVE BEFORE PUBLIC RELEASE if aliases have no non-legacy use.
   const aliases = new Map();
   const ID_RE = /^[a-z][a-z0-9-]*$/;
+  const RESOURCE_TIMEOUT_MS = 8000;
   let defaultId = 'clean';
   let loadPromise = null;
+
+  function fetchJson(url) {
+    const controller = typeof global.AbortController === 'function' ? new global.AbortController() : null;
+    let timer = null;
+    const request = global.fetch(url, {
+      cache: 'no-store',
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+    const timeout = new Promise((_, reject) => {
+      timer = global.setTimeout(() => reject(new Error(`Theme manifest timed out: ${url}`)), RESOURCE_TIMEOUT_MS);
+    });
+    return Promise.race([request, timeout]).then(response => {
+      if (!response.ok) throw new Error(`Could not load theme manifest ${url} (HTTP ${response.status}).`);
+      return response.json();
+    }).finally(() => {
+      if (timer != null) global.clearTimeout(timer);
+      controller?.abort();
+    });
+  }
 
   function absoluteUrl(value, baseUrl) {
     const text = String(value || '').trim();
@@ -131,9 +151,7 @@
   async function load() {
     if (loadPromise) return loadPromise;
     loadPromise = Promise.all(manifestUrls.map(async url => {
-      const response = await global.fetch(url, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Could not load theme manifest ${url} (HTTP ${response.status}).`);
-      const manifest = await response.json();
+      const manifest = await fetchJson(url);
       return register(manifest, url);
     })).then(() => list());
     return loadPromise;

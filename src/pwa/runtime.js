@@ -37,19 +37,40 @@
   let reloadForUpdate = false;
   let lastCheck = 0;
   let intervalId = null;
+  let controlled = false;
+  let controlCallback = null;
+  let controllerListenerInstalled = false;
+
+  const CONTROL_TIMEOUT_MS = 5000;
+  const UPDATE_TIMEOUT_MS = 8000;
+
+  function settleWithin(promise, timeoutMs, label) {
+    let timer = null;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms.`)), timeoutMs);
+    });
+    return Promise.race([Promise.resolve(promise), timeout]).finally(() => clearTimeout(timer));
+  }
 
   function supported() {
     return !!(global.isSecureContext && 'serviceWorker' in navigator);
   }
 
   async function fetchVersionInfo() {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = setTimeout(() => controller?.abort(), UPDATE_TIMEOUT_MS);
     try {
-      const response = await fetch(app.urls.deployment('version.json'), { cache: 'no-store' });
+      const response = await fetch(app.urls.deployment('version.json'), {
+        cache: 'no-store',
+        ...(controller ? { signal: controller.signal } : {}),
+      });
       if (!response.ok) return null;
       versionInfo = await response.json();
       return versionInfo;
     } catch (_) {
       return null;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -82,25 +103,39 @@
     });
   }
 
-  async function register({ onUpdateAvailable } = {}) {
+  function reportControlChange() {
+    controlled = !!navigator.serviceWorker.controller;
+    if (typeof controlCallback === 'function') controlCallback({ controlled, registration });
+    if (reloadForUpdate && controlled) global.location.reload();
+  }
+
+  async function register({ onUpdateAvailable, onControllerChange } = {}) {
     if (!supported()) return null;
     updateCallback = onUpdateAvailable || null;
+    controlCallback = onControllerChange || null;
     registration = await navigator.serviceWorker.register(app.urls.deployment('sw.js'), {
       scope: app.urls.deployment(''),
       updateViaCache: 'none',
     });
 
     registration.addEventListener('updatefound', () => watchInstallingWorker(registration.installing));
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloadForUpdate) global.location.reload();
-    });
+    if (!controllerListenerInstalled) {
+      navigator.serviceWorker.addEventListener('controllerchange', reportControlChange);
+      controllerListenerInstalled = true;
+    }
 
-    await navigator.serviceWorker.ready;
-    await waitUntilControlled();
-    await fetchVersionInfo();
+    // Do not await navigator.serviceWorker.ready here: on a failed first
+    // installation that promise can remain pending indefinitely. The
+    // controllerchange event is the only signal the editor needs, with a
+    // bounded fallback for browsers that cannot take control immediately.
+    controlled = await waitUntilControlled(CONTROL_TIMEOUT_MS);
+    reportControlChange();
 
     if (registration.waiting && navigator.serviceWorker.controller) reportUpdate(registration.waiting);
-    await checkForUpdates();
+    // Update metadata is useful but must not block the editor or workspace
+    // picker. The check is independently time-bounded and deliberately runs in
+    // the background after the first usable application state is available.
+    void checkForUpdates();
 
     if (!intervalId) {
       intervalId = global.setInterval(() => { checkForUpdates(); }, 60 * 60 * 1000);
@@ -114,7 +149,10 @@
   async function checkForUpdates() {
     if (!registration) return null;
     lastCheck = Date.now();
-    await Promise.allSettled([registration.update(), fetchVersionInfo()]);
+    await Promise.allSettled([
+      settleWithin(registration.update(), UPDATE_TIMEOUT_MS, 'Service worker update'),
+      settleWithin(fetchVersionInfo(), UPDATE_TIMEOUT_MS, 'Version check'),
+    ]);
     if (registration.waiting && navigator.serviceWorker.controller) reportUpdate(registration.waiting);
     return versionInfo;
   }
@@ -131,6 +169,7 @@
     register,
     checkForUpdates,
     activateUpdate,
+    get controlled() { return controlled; },
     get versionInfo() { return versionInfo; },
     get registration() { return registration; },
   });

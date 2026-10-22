@@ -42,7 +42,27 @@
   const previewPainters = new Map();
   const previewPromises = new Map();
   const ID_RE = /^[a-z][a-z0-9-]*$/;
+  const RESOURCE_TIMEOUT_MS = 8000;
   let loadPromise = null;
+
+  function fetchJson(url) {
+    const controller = typeof global.AbortController === 'function' ? new global.AbortController() : null;
+    let timer = null;
+    const request = global.fetch(url, {
+      cache: 'no-store',
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+    const timeout = new Promise((_, reject) => {
+      timer = global.setTimeout(() => reject(new Error(`Background manifest timed out: ${url}`)), RESOURCE_TIMEOUT_MS);
+    });
+    return Promise.race([request, timeout]).then(response => {
+      if (!response.ok) throw new Error(`Could not load background manifest ${url} (HTTP ${response.status}).`);
+      return response.json();
+    }).finally(() => {
+      if (timer != null) global.clearTimeout(timer);
+      controller?.abort();
+    });
+  }
 
   function absoluteUrl(value, baseUrl) {
     const text = String(value || '').trim();
@@ -105,9 +125,7 @@
   async function load() {
     if (loadPromise) return loadPromise;
     loadPromise = Promise.all(manifestUrls.map(async url => {
-      const response = await global.fetch(url, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Could not load background manifest ${url} (HTTP ${response.status}).`);
-      const manifest = await response.json();
+      const manifest = await fetchJson(url);
       return register(manifest, url);
     })).then(async () => {
       await Promise.all(list().map(definition => ensurePreview(definition.id)));
@@ -156,15 +174,24 @@
     if (previewPromises.has(key)) return previewPromises.get(key);
     const promise = new Promise(resolve => {
       const script = global.document.createElement('script');
+      let timer = null;
+      const finish = value => {
+        if (timer != null) global.clearTimeout(timer);
+        resolve(value);
+      };
       script.src = definition.previewJsUrl;
       script.async = false;
       script.dataset.revealationBackgroundPreview = key;
-      script.addEventListener('load', () => resolve(previewPainters.get(key) || null), { once: true });
+      script.addEventListener('load', () => finish(previewPainters.get(key) || null), { once: true });
       script.addEventListener('error', () => {
         console.warn(`Could not load static preview for background "${key}".`);
-        resolve(null);
+        finish(null);
       }, { once: true });
       global.document.head.appendChild(script);
+      timer = global.setTimeout(() => {
+        console.warn(`Static preview for background "${key}" timed out.`);
+        finish(null);
+      }, RESOURCE_TIMEOUT_MS);
     });
     previewPromises.set(key, promise);
     return promise;

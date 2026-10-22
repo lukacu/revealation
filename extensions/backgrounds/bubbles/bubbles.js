@@ -106,7 +106,7 @@
       draw(time);
     }
 
-    const shouldRun = () => active && !reducedMotion.matches && !destroyed;
+    const shouldRun = () => active && !document.hidden && !reducedMotion.matches && !destroyed;
     function tick(now) {
       frameId = 0;
       if (!shouldRun()) return;

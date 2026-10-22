@@ -771,7 +771,7 @@ body.light .context-menu button.danger { color: #b91c1c; }
   position: relative;
   overflow: hidden;
 }
-.slide-editor, .slide-source {
+.slide-editor {
   position: relative;
   z-index: 1;
   width: 100%;
@@ -792,10 +792,6 @@ body.light .context-menu button.danger { color: #b91c1c; }
   line-height: var(--r-main-line-height, 1.3);
   text-align: left;
   overflow-wrap: break-word;
-}
-.slide-source {
-  padding: 18px 22px;
-  overflow: auto;
 }
 .slide-frame[data-content-overflow="1"] {
   box-shadow: 0 0 0 3px #d84a4a, 0 6px 24px rgba(0,0,0,.4);
@@ -1117,13 +1113,6 @@ body.light .context-menu button.danger { color: #b91c1c; }
   object-fit: contain;
   outline: 1px dotted rgba(76, 175, 118, .5);
   outline-offset: 4px;
-}
-.slide-source {
-  background: #0c0d10;
-  color: #d8dee9;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 13px;
-  border: none;
 }
 .drop-overlay {
   position: absolute;
@@ -2207,8 +2196,6 @@ kbd {
   /* Whole groups, not single buttons — hiding a lone button would leave the
      group's divider behind as a stray sliver. Both reappear in "More". */
   .tb-group[aria-label="Reveal.js sizing"],
-  .tb-group[aria-label="View"] { display: none; }
-
   /* ---- Stage: the slide, as large as the width allows ---- */
   .stage { padding: 10px; }
   .slide-frame {
@@ -2223,14 +2210,10 @@ kbd {
   /* Same reveal.js geometry on small screens: the whole logical slide is
      uniformly scaled, so line breaks do not change just because the editor is
      narrower. */
-  .slide-source { padding: 12px; }
   .slide-editor {
     padding: var(--stage-slide-padding, var(--rv-slide-padding, 0px));
     font-size: var(--stage-body-size, var(--rv-size-body, var(--r-main-font-size, 22px)));
   }
-  /* Raw HTML is chrome, not slide content, so it doesn't scale with the
-     frame — and 16px keeps iOS from zooming when it takes focus. */
-  .slide-source { font-size: 16px; }
   /* 70vh is taller than the whole frame here. */
   .slide-editor img,
   .slide-editor video { max-height: 100%; }

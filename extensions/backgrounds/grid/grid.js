@@ -86,7 +86,7 @@
     }
     function tick(stamp) {
       frame = 0;
-      if (!active || reducedMotion.matches || destroyed) return;
+      if (!active || document.hidden || reducedMotion.matches || destroyed) return;
       if (last) time += Math.min((stamp - last) / 1000, .06);
       animationState.time = time;
       last = stamp;
@@ -96,8 +96,9 @@
     function sync() {
       stop();
       draw(time);
-      if (active && !reducedMotion.matches && !destroyed) {
+      if (active && !document.hidden && !reducedMotion.matches && !destroyed) {
         ticker = setInterval(() => {
+          if (document.hidden) return;
           time += 1 / 30;
           animationState.time = time;
           draw(time);

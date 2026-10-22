@@ -51,11 +51,25 @@
   const RECENT_TYPE = 'recent-workspace';
   const DECK_FILENAME = 'deck.json';
   const DECK_MD_FILENAME = 'deck.md';
+  const STORAGE_TIMEOUT_MS = 10000;
   const SKIP_DIRS = new Set(['.git', '.hg', '.svn', '__pycache__', 'node_modules', '.venv', 'venv']);
 
   let handleStore = null;
   let activeHandle = null;
   let recentCache = [];
+
+  function settleWithin(promise, label) {
+    let timer = null;
+    const setTimer = global.setTimeout || setTimeout;
+    const clearTimer = global.clearTimeout
+      || (typeof clearTimeout === 'function' ? clearTimeout : () => {});
+    const timeout = new Promise((_, reject) => {
+      timer = setTimer(() => reject(new Error(`${label} timed out after ${STORAGE_TIMEOUT_MS}ms.`)), STORAGE_TIMEOUT_MS);
+    });
+    return Promise.race([Promise.resolve(promise), timeout]).finally(() => {
+      if (timer != null) clearTimer(timer);
+    });
+  }
 
   function supported() {
     return !!(global.isSecureContext && typeof global.showDirectoryPicker === 'function'
@@ -75,7 +89,7 @@
 
   async function openHandleStore() {
     const store = ensureHandleStore();
-    if (!store.isOpen()) await store.open();
+    if (!store.isOpen()) await settleWithin(store.open(), 'Directory storage open');
     return store;
   }
 
@@ -146,7 +160,7 @@
     if (!handle) return 'denied';
     try {
       if (typeof handle.queryPermission === 'function') {
-        return await handle.queryPermission({ mode });
+        return await settleWithin(handle.queryPermission({ mode }), 'Directory permission check');
       }
     } catch (_) {}
     return 'prompt';
@@ -223,6 +237,9 @@
     activeHandle = handle;
     const records = recentCache.length ? recentCache : await loadRecentRecords();
     const record = await findRecentForHandle(handle, records);
+    // The worker may have cached a null or previous handle while this page was
+    // closed. Refresh that cache whenever an active directory is restored.
+    await notifyServiceWorker();
     return infoFor(handle, permission, record);
   }
 
@@ -371,7 +388,7 @@
     return revisionToken(entries);
   }
 
-  async function loadDeck() {
+  async function loadDeckInternal() {
     let project = null;
     let markdown = null;
     let markdownExists = false;
@@ -417,6 +434,10 @@
     };
   }
 
+  async function loadDeck() {
+    return settleWithin(loadDeckInternal(), 'Presentation load');
+  }
+
   function metadataProject(project) {
     const p = project && typeof project === 'object' ? project : {};
     return {
@@ -426,7 +447,7 @@
     };
   }
 
-  async function getWorkspaceState() {
+  async function getWorkspaceStateInternal() {
     const files = await listFiles();
     return {
       ok: true,
@@ -442,6 +463,10 @@
     };
   }
 
+  async function getWorkspaceState() {
+    return settleWithin(getWorkspaceStateInternal(), 'Workspace state scan');
+  }
+
   async function saveDeck(project, markdown, { expectedRevision = null } = {}) {
     // Snapshot the destination before the first await. This matters when the
     // user opens the Change folder picker while a final save is in flight:
@@ -449,7 +474,7 @@
     const root = requireHandle();
     const expectedToken = expectedRevision?.deckToken || expectedRevision || null;
     if (expectedToken) {
-      const currentToken = await deckRevision();
+      const currentToken = await settleWithin(deckRevision(), 'Presentation revision check');
       if (currentToken !== expectedToken) {
         const error = new Error('The presentation changed on disk.');
         error.code = 'WORKSPACE_CONFLICT';
@@ -489,7 +514,7 @@
     return String(path || '').split('/').map(part => encodeURIComponent(part)).join('/');
   }
 
-  async function listFiles() {
+  async function listFilesInternal() {
     const result = [];
     async function scan(dir, prefix = '') {
       for await (const [name, entry] of dir.entries()) {
@@ -520,6 +545,10 @@
     await scan(requireHandle());
     result.sort((a, b) => String(a.path).localeCompare(String(b.path)));
     return result;
+  }
+
+  async function listFiles() {
+    return settleWithin(listFilesInternal(), 'Workspace file scan');
   }
 
   async function uniqueUploadPath(subdir, originalName) {
@@ -561,7 +590,10 @@
   async function notifyServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      const registration = await navigator.serviceWorker.getRegistration(app.urls.deployment(''));
+      const registration = await settleWithin(
+        navigator.serviceWorker.getRegistration(app.urls.deployment('')),
+        'Service worker registration lookup',
+      );
       const workers = [navigator.serviceWorker.controller, registration?.active, registration?.waiting, registration?.installing]
         .filter(Boolean);
       workers.forEach(worker => worker.postMessage({ type: 'WORKSPACE_HANDLE_CHANGED' }));
@@ -585,6 +617,7 @@
     saveDeck,
     listFiles,
     uploadFile,
+    notifyServiceWorker,
     readFile,
     db: Object.freeze({ name: DB_NAME, version: DB_VERSION, store: STORE_HANDLES, key: ACTIVE_KEY }),
   });

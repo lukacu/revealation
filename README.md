@@ -4,7 +4,7 @@
 
 ---
 
-### A local-first Markdown editor for polished reveal.js presentations — with opinions
+### A local-first Markdown editor for polished reveal.js presentations
 
 Create, edit, present, and export technical presentations from a Git-friendly workspace. Bring your ideas, your Markdown, and perhaps a comforting beverage.
 
@@ -21,7 +21,7 @@ Revealation is a local-first web editor for creating technical [reveal.js](https
 
 Prompted with passion and lack of time, Revealation began as a “let’s see what we can get with AI over the weekend” project. Naturally, it spiraled out of control and became a real slide editor.
 
-I have not looked at 99% of the code. I am, however, actively using it and polishing its rough edges iteratively ... which is either a development methodology or a very elaborate way to avoid reading complex code.
+I have not looked at 99% of the code. I am, however, actively using it and polishing its rough edges iteratively ... which is either a development methodology or just an avoidance strategy.
 
 The end goal is simple: finally have full control over my slides without going insane while writing them. Revealation is deliberately heavily opinionated and limited in customization by choice, partly because good defaults are lovely and partly because I have seen some dreadful PowerPoint abominations.
 

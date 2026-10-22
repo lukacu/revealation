@@ -163,8 +163,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     deckHiddenSlideCount: $('#deck-hidden-slide-count'),
     addSlide: $('#btn-add-slide'),
     editor: $('#slide-editor'),
-    source: $('#slide-source'),
-    toggleSource: $('#toggle-source'),
     toolbar: $('#toolbar'),
     undoBtn: $('#btn-undo'),
     redoBtn: $('#btn-redo'),
@@ -939,9 +937,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   let workspaceRevision = null;
   let workspaceExternalRevision = null;
   let workspaceMonitorTimer = null;
+  let workspaceMonitorVisibilityHandler = null;
   let workspaceMonitorBusy = false;
   let workspaceConflict = false;
   let finishWorkspaceChoice = null;
+  let pwaPrepared = false;
 
 
   function activateWorkspace(adapter, info) {
@@ -978,6 +978,42 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function showPwaUpdateAvailable() {
     if (els.pwaUpdateBanner) els.pwaUpdateBanner.hidden = false;
+  }
+
+  function handlePwaControllerChange({ controlled } = {}) {
+    if (!controlled || !workspaceMode || !state) return;
+    // Workspace decks are read directly through the File System Access API,
+    // while their media URLs are resolved by the service worker. If control
+    // arrives after the first render, retry the current slide's media now.
+    renderEditor();
+  }
+
+  async function preparePwaRuntime() {
+    if (pwaPrepared) return;
+    pwaPrepared = true;
+    if (pwaRuntime?.supported?.()) {
+      try {
+        await pwaRuntime.register({
+          onUpdateAvailable: showPwaUpdateAvailable,
+          onControllerChange: handlePwaControllerChange,
+        });
+        // A restored directory was detected before the worker was registered.
+        // Refresh the worker's cached handle now that registration is ready.
+        if (workspaceInfo?.kind === 'directory') await directoryWorkspaceStorage?.notifyServiceWorker?.();
+      } catch (error) {
+        console.warn('PWA service worker registration/update failed', error);
+        // An installed PWA may be launching offline. If an existing worker still
+        // controls this page, its cached shell and directory bridge remain usable
+        // even though register() could not reach sw.js right now.
+        if (!navigator.serviceWorker?.controller) {
+          setStatus('PWA offline support could not be started; using browser storage', false);
+        } else {
+          setStatus('Offline · using installed Revealation version', true);
+        }
+      }
+    } else {
+      setStatus('Browser storage mode · host the app on HTTPS or localhost for folder access', true);
+    }
   }
 
   async function chooseDirectoryWorkspace({ allowCancel = false } = {}) {
@@ -1097,23 +1133,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   async function prepareHostedMode() {
     if (workspaceMode) return false;
-    if (pwaRuntime?.supported?.()) {
-      try {
-        await pwaRuntime.register({ onUpdateAvailable: showPwaUpdateAvailable });
-      } catch (error) {
-        console.warn('PWA service worker registration/update failed', error);
-        // An installed PWA may be launching offline. If an existing worker still
-        // controls this page, its cached shell and directory bridge remain usable
-        // even though register()/update could not reach sw.js right now.
-        if (!navigator.serviceWorker?.controller) {
-          setStatus('PWA offline support could not be started; using browser storage', false);
-        } else {
-          setStatus('Offline · using installed Revealation version', true);
-        }
-      }
-    } else {
-      setStatus('Browser storage mode · host the app on HTTPS or localhost for folder access', true);
-    }
+    await preparePwaRuntime();
     // Always show the welcome/picker when no Python workspace is active. On a
     // supported PWA this offers local folders; otherwise it still gives the
     // user a clear browser-storage fallback instead of silently opening a deck.
@@ -1238,10 +1258,8 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       if (newAssets && oldAssets && newAssets !== oldAssets) {
         workspaceFiles = Array.isArray(current.files) ? current.files : workspaceFiles;
         workspaceRevision = nextRevision;
-        if (!sourceMode) {
-          refreshWorkspaceAssetUrls(els.editor);
-          scheduleIntrinsicSlideReflow();
-        }
+        refreshWorkspaceAssetUrls(els.editor);
+        scheduleIntrinsicSlideReflow();
         if (els.assetsModal && !els.assetsModal.hidden) renderAssetsModal();
       }
     } catch (error) {
@@ -1253,8 +1271,15 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function startWorkspaceMonitor() {
     if (!workspaceMode || !workspaceStorage?.getWorkspaceState) return;
-    clearInterval(workspaceMonitorTimer);
-    workspaceMonitorTimer = setInterval(() => checkWorkspaceChanges(), 5000);
+    const syncMonitor = () => {
+      clearInterval(workspaceMonitorTimer);
+      workspaceMonitorTimer = null;
+      if (document.visibilityState === 'hidden') return;
+      workspaceMonitorTimer = setInterval(() => checkWorkspaceChanges(), 5000);
+    };
+    syncMonitor();
+    workspaceMonitorVisibilityHandler = syncMonitor;
+    document.addEventListener('visibilitychange', workspaceMonitorVisibilityHandler);
     window.addEventListener('focus', () => checkWorkspaceChanges({ force: true }));
     window.addEventListener('pageshow', () => checkWorkspaceChanges({ force: true }));
   }
@@ -1282,7 +1307,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   let library = null;          // { version, currentProjectId, projects: [...] }
   let state = null;            // current project entry (reference into library.projects)
   let selectedSlideIds = [];
-  let sourceMode = false;
   let saveTimer = null;
   let statusTimer = null;
   let suppressContentCapture = 0;
@@ -1504,7 +1528,8 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     markDirty(id);
   }
 
-  // Flush whatever's dirty to IndexedDB. Called by scheduleSave / saveProject.
+  // Flush whatever's dirty to IndexedDB. Called by scheduleSave and explicit
+  // save actions.
   async function flushDirty({ capture = true, expectedRevision = null } = {}) {
     if (workspaceMode) {
       if (!state) return true;
@@ -1572,15 +1597,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     }
   }
 
-  // RV-COMPAT(save-api-shim): REMOVE BEFORE PUBLIC RELEASE.
-  // Compatibility shim. Most code paths call saveProject()/saveLibrary() —
-  // route them through the dirty-tracking flush.
-  function saveProject() {
+  function flushCurrentProject() {
     if (state) markDirty(state.id);
     setSaveState('saving', 'Saving…');
     flushDirty();
   }
-  function saveLibrary() { saveProject(); }
 
   async function deleteProjectRecord(id) {
     if (!browserStore?.isOpen()) return;
@@ -2013,15 +2034,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     const slide = currentSlide();
     normalizeSlideLayout(slide);
     syncEditorSemanticClasses(slide);
-    if (sourceMode) {
-      els.source.value = slide.content;
-    } else {
-      els.editor.innerHTML = slide.content;
-      refreshWorkspaceAssetUrls(els.editor);
-      decorateFragments();
-      decorateRichContent();
-      refreshCropGeometry(els.editor);
-    }
+    els.editor.innerHTML = slide.content;
+    refreshWorkspaceAssetUrls(els.editor);
+    decorateFragments();
+    decorateRichContent();
+    refreshCropGeometry(els.editor);
     renderBackgroundChoices();
     els.subslide.checked = !!slide.vertical;
     els.wip.checked = slide.underConstruction === true;
@@ -2372,7 +2389,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   }
 
   function syncEditorCenteringAndOverflow() {
-    if (!els.editor || sourceMode) {
+    if (!els.editor) {
       els.frame.removeAttribute('data-content-overflow');
       return;
     }
@@ -2418,10 +2435,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   // same conventions so the preview matches what the deck will render.
   function applySlideEffects() {
     updateStageScale();
-    if (sourceMode) {
-      els.frame.removeAttribute('data-content-overflow');
-      return;
-    }
     resetEditorVerticalPadding();
     els.editor.querySelectorAll('.r-fit-text').forEach(fitTextElement);
     els.editor.querySelectorAll('.r-stretch').forEach(stretchElement);
@@ -2752,51 +2765,34 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     // Do not infer layout identity from DOM here. Since 3.4 it is slide-level
     // metadata; doing so reintroduced the old content/metadata coupling.
     if (slide.layout === 'single') {
-      slide.content = sourceMode ? els.source.value : cleanEditorContent(els.editor);
+      slide.content = cleanEditorContent(els.editor);
       slide.blocks = null;
       return true;
     }
 
-    if (!sourceMode) {
-      // Normal WYSIWYG input has a concrete slot target. Commit only that
-      // positional block; the rest of the protected layout is irrelevant to
-      // this edit and must not be revalidated on every keystroke.
-      let node = inputTarget;
-      if (node?.nodeType === Node.TEXT_NODE) node = node.parentElement;
-      const targetedHost = node?.closest?.('.sr-layout-content');
-      if (targetedHost && commitLayoutHost(slide, targetedHost)) return true;
+    // Normal WYSIWYG input has a concrete slot target. Commit only that
+    // positional block; the rest of the protected layout is irrelevant to
+    // this edit and must not be revalidated on every keystroke.
+    let node = inputTarget;
+    if (node?.nodeType === Node.TEXT_NODE) node = node.parentElement;
+    const targetedHost = node?.closest?.('.sr-layout-content');
+    if (targetedHost && commitLayoutHost(slide, targetedHost)) return true;
 
-      // Programmatic toolbar/media commands do not always carry an InputEvent.
-      // Prefer the current selection/active host before sweeping all slots.
-      const sel = window.getSelection?.();
-      let anchor = sel?.rangeCount ? sel.getRangeAt(0).startContainer : null;
-      if (anchor?.nodeType === Node.TEXT_NODE) anchor = anchor.parentElement;
-      const activeHost = anchor?.closest?.('.sr-layout-content')
-        || document.activeElement?.closest?.('.sr-layout-content');
-      if (activeHost && commitLayoutHost(slide, activeHost)) return true;
+    // Programmatic toolbar/media commands do not always carry an InputEvent.
+    // Prefer the current selection/active host before sweeping all slots.
+    const sel = window.getSelection?.();
+    let anchor = sel?.rangeCount ? sel.getRangeAt(0).startContainer : null;
+    if (anchor?.nodeType === Node.TEXT_NODE) anchor = anchor.parentElement;
+    const activeHost = anchor?.closest?.('.sr-layout-content')
+      || document.activeElement?.closest?.('.sr-layout-content');
+    if (activeHost && commitLayoutHost(slide, activeHost)) return true;
 
-      if (captureLayoutHosts(slide)) return true;
+    if (captureLayoutHosts(slide)) return true;
 
-      const message = `Could not commit WYSIWYG content for layout "${slide.layout}": required layout slots are missing.`;
-      console.error(message);
-      setStatus('Edit not saved: required layout slot is missing', false);
-      return false;
-    }
-
-    // RV-COMPAT(html-source-mode): REMOVE BEFORE PUBLIC RELEASE.
-    // Hidden legacy HTML-source mode still edits the canonical HTML string, so
-    // it requires one migration parse before the persistent block model can be
-    // refreshed. This path is no longer exposed in the UI.
-    const content = els.source.value;
-    const extracted = layoutBlocksFromContent(content, slide.layout);
-    if (!extracted) {
-      setStatus('Edit not saved: invalid layout HTML', false);
-      return false;
-    }
-    slide.blocks = extracted.blocks;
-    const rendered = renderSlideBlocks(slide);
-    slide.content = rendered != null ? rendered : content;
-    return true;
+    const message = `Could not commit WYSIWYG content for layout "${slide.layout}": required layout slots are missing.`;
+    console.error(message);
+    setStatus('Edit not saved: required layout slot is missing', false);
+    return false;
   }
 
   function cleanEditorClone(root) {
@@ -3011,16 +3007,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   let editingMathEl = null;
 
   function insertMarkupAtCursor(html) {
-    if (sourceMode) {
-      const ta = els.source;
-      const pos = ta.selectionStart;
-      const before = ta.value.slice(0, pos);
-      const after = ta.value.slice(ta.selectionEnd);
-      ta.value = before + html + after;
-      ta.selectionStart = ta.selectionEnd = pos + html.length;
-      onEditorInput();
-      return;
-    }
     // execCommand('insertHTML') is convenient for ordinary rich text, but
     // Chromium may rewrite custom spans and discard data-* attributes. Our
     // technical blocks (math/code/layouts/assets) need those attributes to
@@ -3143,14 +3129,9 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   }
 
   function openCodeModal(existing = null) {
-    if (sourceMode && !existing) {
-      const ta = els.source;
-      els.codeText.value = ta.value.slice(ta.selectionStart, ta.selectionEnd) || '';
-    } else {
-      els.codeText.value = existing
-        ? (existing.querySelector('code')?.textContent || '')
-        : selectedEditorText();
-    }
+    els.codeText.value = existing
+      ? (existing.querySelector('code')?.textContent || '')
+      : selectedEditorText();
     editingCodeEl = existing;
     let lang = 'python';
     if (existing) {
@@ -4360,7 +4341,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       setStatus('Markdown converter failed to load — check your network.', false);
       return;
     }
-    if (sourceMode) els.toggleSource.click();   // per-slide HTML view is a different scope
     closeToolbarMenu(false);
     markdownMode = true;
     document.body.classList.add('markdown-mode');
@@ -4403,7 +4383,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   async function openMarkdownRecoveryMode() {
     if (markdownMode && !(await dialogs.confirm('Replace the current Markdown buffer with a fresh recovery document?', { title: 'Replace Markdown buffer', confirmLabel: 'Replace', kind: 'warning' }))) return;
     if (!markdownMode) {
-      if (sourceMode) els.toggleSource.click();
       closeToolbarMenu(false);
       markdownMode = true;
       document.body.classList.add('markdown-mode');
@@ -4494,7 +4473,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   async function applyAndCloseMarkdownMode({ save = false } = {}) {
     if (!applyMarkdownToDeck()) return false;
     await closeMarkdownMode({ force: true });
-    if (save) saveProject();
+    if (save) flushCurrentProject();
     return true;
   }
 
@@ -4675,7 +4654,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       alignLeft: q('button[data-action="align-left"]'),
       alignCenter: q('button[data-action="align-center"]'),
       alignRight: q('button[data-action="align-right"]'),
-      commandButtons: els.toolbar.querySelectorAll('button[data-cmd], button[data-action]'),
     };
     return tbRefs;
   }
@@ -4705,17 +4683,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function syncToolbarState() {
     const refs = toolbarRefs();
-    // In HTML source view the rich-text commands have nothing to act on, so
-    // grey them out instead of leaving dead buttons enabled.
-    refs.commandButtons.forEach(btn => { btn.disabled = sourceMode; });
-    els.blockStyle.disabled = sourceMode;
-    setPressed(els.toggleSource, sourceMode);
-    if (sourceMode) {
-      els.toolbar.querySelectorAll('button[aria-pressed]').forEach(btn => {
-        if (btn !== els.toggleSource) setPressed(btn, false);
-      });
-      return;
-    }
 
     // queryCommandState reads the *live* selection, so when focus has left
     // the editor there is nothing meaningful to report — leave the last
@@ -4766,7 +4733,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   // button next to Fragment carries the current value in its tooltip and
   // accessible name, and opens the full list on click.
   function syncFragmentDropdown() {
-    if (sourceMode) return;
     if (!els.fragmentMenuBtn) return;
     const frag = getActiveFragment();
     const type = frag ? getFragmentTypeOf(frag) : fragmentDefaultType;
@@ -4876,11 +4842,9 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function onEditorInput(event = null) {
     captureCurrentContent(event?.target || null);
-    if (!sourceMode) {
-      decorateFragments();
-      decorateRichContent();
-      applySlideEffects();
-    }
+    decorateFragments();
+    decorateRichContent();
+    applySlideEffects();
     syncToolbarState();
     scheduleLabelUpdate();
     if (sidebarController && state) {
@@ -4895,7 +4859,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   let mediaWidthEditing = false;
 
   function mediaFromTarget(target) {
-    if (!target || sourceMode) return null;
+    if (!target) return null;
     // RV-COMPAT(interactive-demo): REMOVE `.sr-demo` BEFORE PUBLIC RELEASE.
     let el = target.closest && target.closest('.sr-interactive, .sr-demo, img, video');
     if (!el && target.closest) {
@@ -4980,7 +4944,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   }
 
   function positionMediaSelection() {
-    if (!selectedMediaEl || !selectedMediaEl.isConnected || sourceMode) {
+    if (!selectedMediaEl || !selectedMediaEl.isConnected) {
       if (els.mediaSelection) els.mediaSelection.hidden = true;
       return;
     }
@@ -4999,7 +4963,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function syncMediaToolbar() {
     const el = selectedMediaEl;
-    if (!el || !el.isConnected || sourceMode) {
+    if (!el || !el.isConnected) {
       if (els.mediaToolbar) els.mediaToolbar.hidden = true;
       if (els.mediaSelection) els.mediaSelection.hidden = true;
       return;
@@ -5602,13 +5566,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
           ? `<a href="${escapeAttr(linkHref)}" target="_blank" rel="noopener noreferrer" class="linked-image">${imgTag}</a>`
           : imgTag;
         recordHistory();
-        if (sourceMode) {
-          const ta = els.source;
-          const pos = ta.selectionStart;
-          ta.value = ta.value.slice(0, pos) + tag + ta.value.slice(ta.selectionEnd);
-          ta.selectionStart = ta.selectionEnd = pos + tag.length;
-          onEditorInput();
-        } else insertHTMLAtCursor(tag, insertionRange);
+        insertHTMLAtCursor(tag, insertionRange);
         setStatus(`Saved ${asset.path}`, true);
       } catch (e) {
         setStatus('Image upload failed: ' + (e.message || String(e)), false);
@@ -5630,17 +5588,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     // Snapshot here (not at the toolbar click) so paste/drop insertions are
     // undoable too, and a cancelled file picker leaves no no-op entry.
     recordHistory();
-    if (sourceMode) {
-      const ta = els.source;
-      const pos = ta.selectionStart;
-      const before = ta.value.slice(0, pos);
-      const after = ta.value.slice(ta.selectionEnd);
-      ta.value = before + tag + after;
-      ta.selectionStart = ta.selectionEnd = pos + tag.length;
-      onEditorInput();
-    } else {
-      insertHTMLAtCursor(tag, insertionRange);
-    }
+    insertHTMLAtCursor(tag, insertionRange);
     if (!result.skipped) {
       const saved = Math.round((1 - result.newSize / result.origSize) * 100);
       setStatus(`Image: ${formatBytes(result.origSize)} → ${formatBytes(result.newSize)} (${saved}% smaller)`, true);
@@ -5655,13 +5603,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
         if (!asset) return;
         const tag = `<video src="${escapeAttr(asset.dataUrl)}" controls playsinline controlsList="nofullscreen nodownload noremoteplayback noplaybackrate" disablePictureInPicture></video><br>`;
         recordHistory();
-        if (sourceMode) {
-          const ta = els.source;
-          const pos = ta.selectionStart;
-          ta.value = ta.value.slice(0, pos) + tag + ta.value.slice(ta.selectionEnd);
-          ta.selectionStart = ta.selectionEnd = pos + tag.length;
-          onEditorInput();
-        } else insertHTMLAtCursor(tag, insertionRange);
+        insertHTMLAtCursor(tag, insertionRange);
         setStatus(`Saved ${asset.path}`, true);
       } catch (e) {
         setStatus('Video upload failed: ' + (e.message || String(e)), false);
@@ -5672,17 +5614,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     rememberAsset({ name: file.name || 'video', type: file.type, dataUrl, size: file.size });
     const tag = `<video src="${escapeAttr(dataUrl)}" controls playsinline controlsList="nofullscreen nodownload noremoteplayback noplaybackrate" disablePictureInPicture></video><br>`;
     recordHistory();
-    if (sourceMode) {
-      const ta = els.source;
-      const pos = ta.selectionStart;
-      const before = ta.value.slice(0, pos);
-      const after = ta.value.slice(ta.selectionEnd);
-      ta.value = before + tag + after;
-      ta.selectionStart = ta.selectionEnd = pos + tag.length;
-      onEditorInput();
-    } else {
-      insertHTMLAtCursor(tag, insertionRange);
-    }
+    insertHTMLAtCursor(tag, insertionRange);
     setStatus(`Video: ${formatBytes(file.size)}`, true);
   }
 
@@ -8130,7 +8062,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   // -------- Projects modal --------
   function openProjectsModal() {
     captureCurrentContent();
-    saveLibrary();
+    flushCurrentProject();
     renderProjectsList();
     showModal(els.projectsModal);
   }
@@ -9248,7 +9180,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     // deliberately redundant safety net for browser/IME edit sequences that
     // may coalesce input events immediately before sidebar navigation.
     els.editor.addEventListener('focusout', (event) => {
-      if (sourceMode) return;
       // Sidebar/context-menu actions either select a slide (which captures
       // explicitly) or mutate slide metadata without touching the WYSIWYG
       // content. Do not let focus movement for those actions sweep an
@@ -9257,7 +9188,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       if (next && (els.slideList.contains(next) || els.slideMenu.contains(next))) return;
       captureCurrentContent();
     });
-    els.source.addEventListener('input', onEditorInput);
 
     document.addEventListener('selectionchange', () => {
       rememberEditorRange();
@@ -9468,16 +9398,6 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
         handleToolbarAction(action);
       }
       syncToolbarState();
-    });
-
-    els.toggleSource.addEventListener('click', () => {
-      captureCurrentContent();
-      clearMediaSelection();
-      sourceMode = !sourceMode;
-      els.editor.hidden = sourceMode;
-      els.source.hidden = !sourceMode;
-      syncToolbarState();
-      renderEditor();
     });
 
     els.bgChoices?.addEventListener('click', event => {
@@ -9790,13 +9710,13 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
         return;
       }
       if (e.key === 'Delete' && selectedMediaEl && selectedMediaEl.isConnected
-          && !markdownMode && !sourceMode && inEditor) {
+          && !markdownMode && inEditor) {
         e.preventDefault();
         e.stopPropagation();
         removeSelectedMedia();
         return;
       }
-      if (mod && e.altKey && (e.key === 'u' || e.key === 'U') && !markdownMode && !sourceMode && !inModal
+      if (mod && e.altKey && (e.key === 'u' || e.key === 'U') && !markdownMode && !inModal
           && (!inTextControl || inEditor)) {
         e.preventDefault();
         toggleSlideUnderConstruction(state.currentId);
@@ -9809,7 +9729,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
       else if (mod && e.key === 's') {
         e.preventDefault();
         if (markdownMode) await applyAndCloseMarkdownMode({ save: true });
-        else saveProject();
+        else flushCurrentProject();
       }
       else if (mod && e.shiftKey && e.key === 'Enter') { e.preventDefault(); openNewSlideLayoutModal(); }
       else if (mod && e.shiftKey && e.key === ',') { e.preventDefault(); openDeckSettingsModal(); }
@@ -9917,7 +9837,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
         clearTimeout(saveTimer);
         saveTimer = null;
         captureCurrentContent();
-        saveProject();
+        flushCurrentProject();
       }
     });
 
@@ -9927,7 +9847,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
         captureCurrentContent();
         if (workspaceMode && state && workspaceStorage?.saveBeacon) {
           workspaceStorage.saveBeacon(state, workspaceRevision?.deckToken || null);
-        } else saveProject();
+        } else flushCurrentProject();
       }
     });
 
@@ -9955,6 +9875,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   }
   populateThemeOptions();
   await detectWorkspace();
+  if (workspaceMode && workspaceInfo?.kind === 'directory') await preparePwaRuntime();
   if (!workspaceMode) await prepareHostedMode();
   library = await loadLibrary();
   state = library.projects.find(p => p.id === library.currentProjectId) || library.projects[0];
