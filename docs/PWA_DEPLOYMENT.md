@@ -1,23 +1,30 @@
 # PWA deployment
 
-Revealation can run in two persistence modes without changing the presentation
-workspace format:
+Revealation's primary deployment is a static HTTPS PWA. It uses the browser
+File System Access API to work directly in a user-selected presentation
+directory. Only the directory handle is remembered in IndexedDB; presentation
+data remains in ordinary files in that directory. When local-directory access
+is unavailable or declined, the PWA falls back to browser-backed storage.
 
-- **Local server mode** — `./start.sh /path/to/presentation` uses the Python
-  workspace API in `server.py`.
-- **Hosted/PWA mode** — a static HTTPS deployment uses the browser File System
-  Access API to work directly in a user-selected presentation directory. Only
-  the directory handle is remembered in IndexedDB; presentation data remains in
-  ordinary files in that directory.
+The local Python workspace server is a development and offline fallback. It is
+useful for testing the filesystem adapter or running the editor from a local
+checkout without a hosted PWA deployment:
 
-The hosted mode is intended primarily for Chromium-family browsers because
+```bash
+./start.sh /path/to/presentation
+```
+
+Then open `http://127.0.0.1:8000/`. It requires Python 3 and uses only the
+standard library.
+
+The hosted PWA is intended primarily for Chromium-family browsers because
 `showDirectoryPicker()` is not implemented consistently across browsers. When
 local-directory access is unavailable or declined, Revealation falls back to
 its existing browser storage mode.
 
-## GitHub Pages layout
+## PWA artifact layout
 
-The deployment build preserves the same URL split used by the local server:
+The deployment build creates the static PWA artifact:
 
 ```text
 <deployment root>/

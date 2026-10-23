@@ -29,8 +29,9 @@ references are relative paths under `assets/`; binary data is never embedded as
 base64 in `deck.json`. Remote URLs remain remote references.
 
 Native package import/export is independent of the working-project backend.
-IndexedDB, a selected directory, and the local server workspace continue to
-autosave their normal `deck.json`/`deck.md` files; `.revealation` is the portable
+IndexedDB, a PWA-selected directory, and the local Python workspace used for
+development/offline operation continue to autosave their normal
+`deck.json`/`deck.md` files; `.revealation` is the portable
 exchange format and is not rewritten after every edit. Browser file inputs and
 Blob downloads are sufficient, so directory access is not required.
 

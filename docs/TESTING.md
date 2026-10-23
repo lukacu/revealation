@@ -1,13 +1,26 @@
 # Testing Revealation
 
-Run the permanent dependency-free checks first (this includes a temporary workspace server smoke test):
+Run the permanent dependency-free checks first (this includes a temporary
+Python workspace-server smoke test for the development/offline adapter):
 
 ```bash
 ./tests/check.sh
 ```
 
 
-There is no development bundling step, so tests focus on source syntax, contracts and a real local workspace smoke test. `tests/test_directory_registry.js` verifies multiple remembered directory handles, permission reconnect, deduplication and history removal. `tests/test_storage_roundtrip.js` verifies a complete IndexedDB-adapter → backup ZIP → fresh IndexedDB-adapter round trip, including assets and metadata, plus corrupt-backup rejection and transaction rollback. `tests/test_native_package.js` verifies `.revealation` archive ordering, native asset round trips, and invalid MIME rejection. The suite also assembles a temporary GitHub Pages/PWA artifact and validates its manifest, service worker, cache manifest and subdirectory-safe resource paths. `tests/check_compatibility_debt.py` also verifies that every temporary `RV-COMPAT(...)` marker has a documented cleanup id and that every inventory id is still represented in code/tests.
+There is no development bundling step, so tests focus on source syntax,
+contracts, the development/offline workspace adapter, and the hosted PWA
+artifact. `tests/test_directory_registry.js` verifies multiple remembered
+directory handles, permission reconnect, deduplication and history removal.
+`tests/test_storage_roundtrip.js` verifies a complete IndexedDB-adapter → backup
+ZIP → fresh IndexedDB-adapter round trip, including assets and metadata, plus
+corrupt-backup rejection and transaction rollback. `tests/test_native_package.js`
+verifies `.revealation` archive ordering, native asset round trips, and invalid
+MIME rejection. The suite also assembles a temporary GitHub Pages/PWA artifact
+and validates its manifest, service worker, cache manifest and subdirectory-safe
+resource paths. `tests/check_compatibility_debt.py` also verifies that every
+temporary `RV-COMPAT(...)` marker has a documented cleanup id and that every
+inventory id is still represented in code/tests.
 
 ## Static checks
 

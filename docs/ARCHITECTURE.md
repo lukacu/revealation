@@ -1,6 +1,6 @@
 # Revealation architecture
 
-Revealation is a standalone local-first presentation editor built around reveal.js. It originated from Small Reveal, but **Small Reveal is historical upstream, not an architectural layer**.
+Revealation is a standalone local-first PWA presentation editor built around reveal.js. It originated from Small Reveal, but **Small Reveal is historical upstream, not an architectural layer**.
 
 The project intentionally has **no development bundling/compilation step**. Browser source files are loaded directly and register APIs under `window.Revealation`. Static/PWA deployment uses a small assembly script only to create the deployment tree and generated service-worker/version metadata.
 
@@ -138,7 +138,7 @@ The editor core decides *what* and *when* to save. Storage adapters decide *how*
 
 `workspace.js` owns all `/api/...` calls. `directory.js` owns File System Access directory operations and the recent-folder handle registry for hosted/PWA mode. `indexeddb.js` owns browser transaction mechanics. `backup.js` owns the versioned browser-library backup format. None parses Revealation Markdown or mutates editor state.
 
-Launch mode chooses the filesystem adapter: the Python workspace is preferred when `/api/workspace` is available; otherwise a hosted secure-context deployment can connect a local directory. Multiple recent directory handles can be remembered in IndexedDB, while exactly one is marked active for the service worker and presentation content remains ordinary files. The PWA service worker maps presentation-relative requests back to that directory so assets and iframe-backed interactive content keep the same URL semantics as the Python server.
+Launch mode chooses the filesystem adapter: the hosted PWA is the primary deployment and connects a local directory in a secure browser context; the Python workspace is retained for development and offline use. Multiple recent directory handles can be remembered in IndexedDB, while exactly one is marked active for the service worker and presentation content remains ordinary files. The PWA service worker maps presentation-relative requests back to that directory so assets and iframe-backed interactive content keep the same URL semantics as the Python server.
 
 See `src/storage/README.md`, ADR 002 and ADR 010.
 

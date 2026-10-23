@@ -11,7 +11,8 @@ Release history in `CHANGELOG.md` is documentation, and tests that do not
 exercise version behavior should use an explicit fixture version rather than
 copying the application version.
 
-Run against a scratch workspace:
+For development or an offline local fallback, run the Python workspace server
+against a scratch workspace:
 
 ```bash
 ./start.sh /tmp/revealation-test-deck

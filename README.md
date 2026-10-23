@@ -4,7 +4,7 @@
 
 ---
 
-### A local-first Markdown editor for polished reveal.js presentations
+### A local-first PWA Markdown editor for polished reveal.js presentations
 
 Create, edit, present, and export technical presentations from a Git-friendly workspace. Bring your ideas, your Markdown, and perhaps a comforting beverage.
 
@@ -16,6 +16,11 @@ Create, edit, present, and export technical presentations from a Git-friendly wo
 </div>
 
 Revealation is a local-first web editor for creating technical [reveal.js](https://revealjs.com/) presentations. The presentation source is human-readable Markdown. A workspace stores slide content in `deck.md`, project metadata in `deck.json`, and media or other resources as ordinary files with relative paths. This makes presentations easy to edit, move, back up, and version with Git.
+
+> **Under development:** Revealation is an actively developed alpha project.
+> Features, storage behavior, and deployment workflows may change, and it is
+> not yet recommended as the only copy of important presentations. See the
+> [release limitations](docs/RELEASE_LIMITATIONS.md) before relying on it.
 
 ## Why this exists
 
@@ -45,25 +50,28 @@ The project is based on [Small Reveal](https://github.com/samplereality/small-re
 
 ## Quick start
 
-For the local workspace server, requirements are Python 3 and a modern browser.
+The recommended way to use Revealation is the hosted, installable PWA. Open
+the [online version](https://lukacu.github.io/revealation/) over HTTPS, choose
+or create a presentation folder, and optionally install it from the browser.
+On supported Chromium-family browsers the PWA uses the File System Access API
+for local presentation folders; other browsers retain browser-storage fallback.
+See [`docs/PWA_DEPLOYMENT.md`](docs/PWA_DEPLOYMENT.md) for self-hosting and
+GitHub Pages deployment.
 
-Start Revealation with a presentation directory as its workspace:
+For development or an offline local fallback, use the Python workspace server.
+It requires Python 3 and a modern browser:
 
 ```bash
 ./start.sh /path/to/presentation
 ```
 
-Then open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) in a browser. If no directory is supplied, the current directory is used.
-
-For local development, use a temporary or scratch workspace:
+Then open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) in a browser. If no directory is supplied, the current directory is used. A temporary workspace is useful for development:
 
 ```bash
 ./start.sh /tmp/revealation-workspace
 ```
 
-No Node.js, npm, database, or Python packages are required for normal local use.
-
-Revealation can also be deployed as an installable static PWA. On supported Chromium-family browsers it opens a local presentation folder directly through the File System Access API; on other browsers it retains browser-storage fallback. The repository includes a GitHub Pages workflow for `main`. See [`docs/PWA_DEPLOYMENT.md`](docs/PWA_DEPLOYMENT.md).
+No Node.js, npm, database, or Python packages are required for normal use.
 
 For the alpha release, Chromium-family browsers are preferred for local-folder
 PWA access. Standalone HTML cannot reliably bundle complex interactive apps,
