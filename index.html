@@ -474,6 +474,13 @@
       <button type="button" id="about-close">Close</button>
     </div>
     <div id="about-body" class="about-body"></div>
+    <div class="about-verification" aria-labelledby="about-verification-title">
+      <div>
+        <strong id="about-verification-title">Deployment verification</strong>
+        <p id="about-verification-status" role="status" aria-live="polite">Not checked yet.</p>
+      </div>
+      <button type="button" id="about-verify">Verify now</button>
+    </div>
   </div>
 </div>
 
@@ -611,6 +618,7 @@
 <script src="./__app__/vendor/highlight/highlight.min.js"></script>
 <!-- Revealation source files are intentionally plain browser scripts: no build step. -->
 <script src="./__app__/src/core/revealation.js"></script>
+<script src="./__app__/src/pwa/build.js"></script>
 <script src="./__app__/src/platform/browser.js"></script>
 <script src="./__app__/src/platform/platform.js"></script>
 <script src="./__app__/src/core/slide-model.js"></script>

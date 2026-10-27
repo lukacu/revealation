@@ -1934,6 +1934,20 @@ body.light .sync-error { color: #b91c1c; }
 .about-details dt { color: var(--muted); }
 .about-details dd { margin: 0; overflow-wrap: anywhere; }
 .about-details a { color: var(--accent); }
+.about-verification {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-2) 65%, transparent);
+  font-size: 12px;
+}
+.about-verification > div { flex: 1; min-width: 0; }
+.about-verification p { margin: 3px 0 0; color: var(--muted); line-height: 1.4; }
+.about-verification button { flex: 0 0 auto; white-space: nowrap; }
 
 
 /* Deck settings / export / help ----------------------------------------- */

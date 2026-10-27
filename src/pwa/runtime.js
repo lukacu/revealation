@@ -23,7 +23,8 @@
  *
  * Public API
  * ----------
- * `Revealation.pwa.{supported,register,checkForUpdates,activateUpdate,versionInfo}`
+ * `Revealation.pwa.{supported,register,checkForUpdates,verifyDeployment,
+ * activateUpdate,versionInfo}`
  */
 (function registerPwaRuntime(global) {
   'use strict';
@@ -64,10 +65,19 @@
         cache: 'no-store',
         ...(controller ? { signal: controller.signal } : {}),
       });
-      if (!response.ok) return null;
-      versionInfo = await response.json();
+      if (!response.ok) {
+        versionInfo = null;
+        return null;
+      }
+      const next = await response.json();
+      if (!next || typeof next !== 'object') {
+        versionInfo = null;
+        return null;
+      }
+      versionInfo = next;
       return versionInfo;
     } catch (_) {
+      versionInfo = null;
       return null;
     } finally {
       clearTimeout(timer);
@@ -147,14 +157,28 @@
   }
 
   async function checkForUpdates() {
-    if (!registration) return null;
     lastCheck = Date.now();
-    await Promise.allSettled([
-      settleWithin(registration.update(), UPDATE_TIMEOUT_MS, 'Service worker update'),
+    const checks = [
       settleWithin(fetchVersionInfo(), UPDATE_TIMEOUT_MS, 'Version check'),
-    ]);
-    if (registration.waiting && navigator.serviceWorker.controller) reportUpdate(registration.waiting);
+    ];
+    if (registration) checks.unshift(
+      settleWithin(registration.update(), UPDATE_TIMEOUT_MS, 'Service worker update'),
+    );
+    await Promise.allSettled(checks);
+    if (registration?.waiting && navigator.serviceWorker.controller) reportUpdate(registration.waiting);
     return versionInfo;
+  }
+
+  async function verifyDeployment() {
+    await checkForUpdates();
+    const currentBuild = app.build || null;
+    const deployedBuild = versionInfo?.build || null;
+    return {
+      currentBuild,
+      deployedBuild,
+      matches: !!(currentBuild && deployedBuild && currentBuild === deployedBuild),
+      versionInfo,
+    };
   }
 
   function activateUpdate() {
@@ -168,6 +192,7 @@
     supported,
     register,
     checkForUpdates,
+    verifyDeployment,
     activateUpdate,
     get controlled() { return controlled; },
     get versionInfo() { return versionInfo; },

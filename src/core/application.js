@@ -43,6 +43,7 @@
   'use strict';
 
   const APP_VERSION = window.Revealation?.version || '0.0.0';
+  const APP_BUILD = window.Revealation?.build || null;
   const APP_INFO = window.Revealation?.info || { name: 'Revealation' };
   const slideModel = window.Revealation?.core?.slideModel;
   const createHistory = window.Revealation?.core?.createHistory;
@@ -308,6 +309,8 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     aboutClose: $('#about-close'),
     aboutTitle: $('#about-title'),
     aboutBody: $('#about-body'),
+    aboutVerificationStatus: $('#about-verification-status'),
+    aboutVerify: $('#about-verify'),
     settingsButton: $('#btn-settings'),
     settingsModal: $('#settings-modal'),
     settingsClose: $('#settings-close'),
@@ -978,6 +981,34 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   function showPwaUpdateAvailable() {
     if (els.pwaUpdateBanner) els.pwaUpdateBanner.hidden = false;
+  }
+
+  async function verifyPwaDeployment() {
+    if (!els.aboutVerificationStatus || !els.aboutVerify) return;
+    els.aboutVerify.disabled = true;
+    els.aboutVerificationStatus.textContent = 'Checking the published deployment…';
+    try {
+      const result = await pwaRuntime?.verifyDeployment?.();
+      if (!result?.versionInfo) {
+        els.aboutVerificationStatus.textContent = APP_BUILD
+          ? `Running packaged build ${APP_BUILD}, but published deployment metadata is unavailable.`
+          : 'No packaged build id or published deployment metadata is available in this local build.';
+        return;
+      }
+      const published = result.deployedBuild || 'unknown';
+      if (result.matches) {
+        els.aboutVerificationStatus.textContent = `Verified: running build ${result.currentBuild} matches the published deployment.`;
+      } else if (!result.currentBuild) {
+        els.aboutVerificationStatus.textContent = `Published build ${published} is available; this development copy has no packaged build id.`;
+      } else {
+        els.aboutVerificationStatus.textContent = `Build mismatch: running ${result.currentBuild}; published ${published}. An update may be waiting below.`;
+        if (pwaRuntime?.registration?.waiting) showPwaUpdateAvailable();
+      }
+    } catch (error) {
+      els.aboutVerificationStatus.textContent = `Could not verify the deployment: ${error.message || error}`;
+    } finally {
+      els.aboutVerify.disabled = false;
+    }
   }
 
   function handlePwaControllerChange({ controlled } = {}) {
@@ -9576,6 +9607,7 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
           : 'Local folder · File System Access API')
         : 'Browser storage · IndexedDB';
       addDetail('Version', APP_VERSION);
+      addDetail('Build', APP_BUILD || 'Development build');
       addDetail('Platform', platformLabel);
       addDetail('Backend', backendLabel);
       addDetail('Project', APP_INFO.projectLabel || APP_INFO.projectUrl, APP_INFO.projectUrl);
@@ -9588,6 +9620,12 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     };
     const closeAboutModal = () => { hideModal(els.aboutModal); };
     renderAboutModal();
+    if (els.aboutVerificationStatus) {
+      els.aboutVerificationStatus.textContent = APP_BUILD
+        ? `Loaded build ${APP_BUILD}. Verify against the published deployment when needed.`
+        : 'This is a development copy without a packaged build id.';
+    }
+    els.aboutVerify?.addEventListener('click', verifyPwaDeployment);
     els.appBrand.addEventListener('click', openAboutModal);
     els.aboutClose.addEventListener('click', closeAboutModal);
     els.aboutModal.addEventListener('click', (e) => {

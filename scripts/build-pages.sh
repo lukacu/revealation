@@ -62,6 +62,15 @@ with open(path, 'w', encoding='utf-8') as f:
     f.write('\n')
 PY
 
+python3 - "$DIST/__app__/src/pwa/build.js" "$BUILD_ID" <<'PY'
+from pathlib import Path
+import sys
+
+path, build = Path(sys.argv[1]), sys.argv[2]
+source = path.read_text(encoding='utf-8')
+path.write_text(source.replace('__BUILD_ID__', build, 1), encoding='utf-8')
+PY
+
 # Every deployment gets a different worker body, so the browser's normal
 # service-worker update algorithm reliably discovers new application versions.
 sed "s/__BUILD_ID__/$BUILD_ID/g" pwa/sw.template.js > "$DIST/sw.js"

@@ -114,6 +114,13 @@ On every startup Revealation registers the worker and checks for an update. It
 also checks periodically and after returning to the window. `version.json` is
 always fetched with `cache: "no-store"` so the UI can see current build metadata.
 
+The About dialog shows the running application version and content build id.
+Use **Verify now** there to compare the loaded build with the published
+`version.json` metadata and perform an immediate service-worker update check.
+A match confirms that the loaded application corresponds to the deployment;
+a mismatch identifies the running and published build ids and surfaces the
+normal update action when a new worker is waiting.
+
 A newly installed worker does **not** immediately replace an existing one.
 Revealation shows an **Update** banner, saves pending deck changes, sends
 `SKIP_WAITING` only after the user accepts the update, and reloads when the new

@@ -46,6 +46,7 @@ def main() -> None:
             "__app__/src/storage/directory.js",
             "__app__/src/storage/backup.js",
             "__app__/src/pwa/runtime.js",
+            "__app__/src/pwa/build.js",
             "__app__/icons/icon-192.png",
             "__app__/icons/icon-512.png",
             "__app__/icons/icon-512-maskable.png",
@@ -60,6 +61,11 @@ def main() -> None:
         assert version["commit"] == env["GITHUB_SHA"]
         assert version["version"]
 
+        build_marker = (dist / "__app__/src/pwa/build.js").read_text("utf-8")
+        assert "pwa-smoke-build" in build_marker
+        assert "__BUILD_ID__" not in build_marker
+        assert "app.build = generatedBuild.startsWith('__BUILD_') ? null : generatedBuild;" in build_marker
+
         index = (dist / "index.html").read_text("utf-8")
         assert 'data-revealation-static="true"' in index
 
@@ -69,6 +75,8 @@ def main() -> None:
         assert "revealation-shell-" in sw
         assert "WORKSPACE_HANDLE_CHANGED" in sw
         assert "const RESERVED_ROOT_PREFIXES = ['__app__/'];" in sw
+        assert "const cached = await cache.match(scopeUrl('index.html')) || await cache.match(scopeUrl(''));" in sw
+        assert "if (cached) return cached;" in sw
 
         manifest = json.loads((dist / "manifest.webmanifest").read_text("utf-8"))
         assert manifest["id"] == "./"

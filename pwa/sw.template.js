@@ -191,6 +191,15 @@ async function shellResponse(request, relativePath) {
 
   const cache = await caches.open(CACHE_NAME);
   if (request.mode === 'navigate' && (relativePath === '' || relativePath === 'index.html')) {
+    // Keep the document and its cache-first application scripts from coming
+    // from different deployments. A network-first navigation can fetch a new
+    // index.html while the currently active worker still serves the previous
+    // __app__/ tree, which produces null DOM bindings during wire() and can
+    // make media appear to disappear. The next worker installation already
+    // fetches the complete new shell into its own versioned cache; activation
+    // then switches the document and scripts together.
+    const cached = await cache.match(scopeUrl('index.html')) || await cache.match(scopeUrl(''));
+    if (cached) return cached;
     try {
       const response = await fetch(request);
       if (response.ok) cache.put(scopeUrl('index.html'), response.clone());

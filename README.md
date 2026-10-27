@@ -4,7 +4,7 @@
 
 ---
 
-### A local-first PWA Markdown editor for polished reveal.js presentations
+### A web-based editor for polished reveal.js presentations
 
 Create, edit, present, and export technical presentations from a Git-friendly workspace. Bring your ideas, your Markdown, and perhaps a comforting beverage.
 
@@ -15,7 +15,7 @@ Create, edit, present, and export technical presentations from a Git-friendly wo
 
 </div>
 
-Revealation is a local-first web editor for creating technical [reveal.js](https://revealjs.com/) presentations. The presentation source is human-readable Markdown. A workspace stores slide content in `deck.md`, project metadata in `deck.json`, and media or other resources as ordinary files with relative paths. This makes presentations easy to edit, move, back up, and version with Git.
+Revealation is a web-based editor for creating technical [reveal.js](https://revealjs.com/) presentations. The presentation source is human-readable Markdown. A workspace stores slide content in `deck.md`, project metadata in `deck.json`, and media or other resources as ordinary files with relative paths. This makes presentations easy to edit, move, back up, and version with Git.
 
 > **Under development:** Revealation is an actively developed alpha project.
 > Features, storage behavior, and deployment workflows may change, and it is
@@ -30,9 +30,8 @@ I have not looked at 99% of the code. I am, however, actively using it and polis
 
 The end goal is simple: finally have full control over my slides without going insane while writing them. Revealation is deliberately heavily opinionated and limited in customization by choice, partly because good defaults are lovely and partly because I have seen some dreadful PowerPoint abominations.
 
-Markdown is the secret ingredient. It makes conversations with AI dramatically easier: the source is readable, portable, diffable, and much less mysterious than a pile of presentation-editor internals.
-
 The project is based on [Small Reveal](https://github.com/samplereality/small-reveal/), which showed me what was possible and gave this weekend experiment somewhere wonderful to start.
+Markdown is the secret ingredient. It makes conversations with AI dramatically easier: the source is readable, portable, diffable, and much less mysterious than a pile of presentation-editor internals.
 
 ## Features
 
