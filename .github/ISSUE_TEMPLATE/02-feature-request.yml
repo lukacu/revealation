@@ -1,0 +1,53 @@
+name: Feature request
+description: Suggest a focused improvement to the Revealation editing or presenting experience.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Revealation favors a simple, focused editor with curated themes and
+        extensibility over a large collection of styling controls. Please
+        explain the use case before proposing an implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to accomplish, and what is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe what users should be able to do, rather than only a specific code change.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Editor / Markdown
+        - Presentation / Reveal.js
+        - Export / print
+        - Themes / backgrounds / extensions
+        - Storage / PWA / desktop
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Workarounds or alternatives (optional)
+      description: Include examples, mockups, or a sample deck if they would help.
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for similar requests.
+          required: true

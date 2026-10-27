@@ -1,0 +1,97 @@
+name: Bug report
+description: Report a reproducible problem in Revealation.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Revealation. Please reduce the problem to a
+        **minimal `.revealation` presentation** that still reproduces it.
+        GitHub does not accept `.revealation` attachments directly: put the file
+        in a `.zip` archive and upload that archive below.
+
+        **Do not include private slides, credentials, API keys, or personal data.**
+  - type: input
+    id: version
+    attributes:
+      label: Revealation version
+      description: Give the exact app version/build (from About or version.json), or a Git commit. "Latest" is not sufficient.
+      placeholder: "e.g. v0.1.0 / build ID / Git SHA"
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Where does it happen?
+      options:
+        - Hosted web app / PWA
+        - Local server
+        - Desktop wrapper
+        - Standalone exported HTML
+        - PDF export / print
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and browser / wrapper
+      description: Include browser version for web/PWA, or desktop wrapper name and version.
+      placeholder: "e.g. Ubuntu 24.04, Firefox 156"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Number the exact actions, starting from opening the attached presentation. Include the slide number if relevant.
+      placeholder: |
+        1. Open the attached minimal presentation.
+        2. Select slide 2 and edit the equation.
+        3. Switch to Present mode.
+        4. Observe ...
+    validations:
+      required: true
+  - type: upload
+    id: minimal-reproducer
+    attributes:
+      label: Minimal `.revealation` reproducer (ZIP)
+      description: |
+        Required for bug reports. Upload a `.zip` containing the smallest
+        `.revealation` presentation that still demonstrates the issue.
+        Remove unrelated slides/assets and confidential content, then verify it
+        still reproduces. If GitHub file uploads are unavailable, provide an
+        accessible link in the steps above instead.
+    validations:
+      required: true
+      accept: ".zip"
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+      description: Include any error message exactly as displayed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Additional context (optional)
+      description: Screenshots, a short recording, console errors, or whether this differs between Edit, Present, HTML export, and PDF/print.
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched for existing reports of this issue.
+          required: true
+        - label: I verified that the minimal presentation still reproduces the problem and contains no sensitive data.
+          required: true
