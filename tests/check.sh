@@ -14,6 +14,7 @@ python3 tests/check_structure.py
 python3 tests/check_compatibility_debt.py
 node tests/test_modules.js
 node tests/test_directory_registry.js
+node tests/test_directory_workspace_race.js
 node tests/test_pwa_runtime.js
 node tests/test_lifecycle_regressions.js
 node tests/test_storage_roundtrip.js

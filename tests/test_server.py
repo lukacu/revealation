@@ -79,6 +79,57 @@ def main() -> None:
             assert deck["project"]["name"] == "Smoke"
             assert deck["markdown"] == saved_markdown
             assert deck["markdownPreferred"] is True
+
+            # A deck save replaces deck.json and deck.md separately.  A load
+            # must wait for the pair, otherwise it can rebuild an empty deck
+            # from new metadata plus old/missing Markdown.
+            original_replace = Path.replace
+            replace_started = threading.Event()
+            release_replace = threading.Event()
+            load_finished = threading.Event()
+            save_result = {}
+            load_result = {}
+
+            def delayed_replace(source, target):
+                result = original_replace(source, target)
+                if Path(target).name == "deck.json":
+                    replace_started.set()
+                    release_replace.wait(5)
+                return result
+
+            def save_in_thread():
+                save_result["value"] = request_json(
+                    base + "/api/deck",
+                    method="POST",
+                    payload={
+                        "project": {"id": "smoke", "name": "Pairwise save", "slides": [{"id": "new"}]},
+                        "markdown": "# Pairwise save\n",
+                    },
+                )
+
+            def load_in_thread():
+                load_result["value"] = request_json(base + "/api/deck")
+                load_finished.set()
+
+            Path.replace = delayed_replace
+            save_thread = threading.Thread(target=save_in_thread)
+            load_thread = threading.Thread(target=load_in_thread)
+            try:
+                save_thread.start()
+                assert replace_started.wait(5), "save did not reach the pairwise-write boundary"
+                load_thread.start()
+                assert not load_finished.wait(0.25), "deck load was not serialized with the two-file save"
+            finally:
+                release_replace.set()
+                save_thread.join(5)
+                load_thread.join(5)
+                Path.replace = original_replace
+
+            assert save_result["value"]["ok"] is True
+            assert load_result["value"]["project"]["name"] == "Pairwise save"
+            assert load_result["value"]["markdown"] == "# Pairwise save\n"
+            deck = load_result["value"]
+
             state = request_json(base + "/api/workspace-state")
             assert state["revision"]["deckToken"] == deck["revision"]["deckToken"]
             (workspace / "deck.md").write_text("# Changed externally\n", encoding="utf-8")

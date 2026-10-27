@@ -297,43 +297,50 @@ class Handler(BaseHTTPRequestHandler):
                 "metadataFile": DECK_FILENAME,
             })
         if path == "/api/deck":
-            project = None
-            markdown = None
-            errors = []
-            if self.deck_path.exists():
-                try:
-                    project = json.loads(self.deck_path.read_text("utf-8"))
-                except Exception as exc:
-                    errors.append(f"Cannot read {DECK_FILENAME}: {exc}")
-            if self.deck_md_path.exists():
-                try:
-                    markdown = self.deck_md_path.read_text("utf-8")
-                except Exception as exc:
-                    errors.append(f"Cannot read {DECK_MD_FILENAME}: {exc}")
-            json_mtime = self.deck_path.stat().st_mtime_ns if self.deck_path.exists() else 0
-            md_mtime = self.deck_md_path.stat().st_mtime_ns if self.deck_md_path.exists() else 0
-            return self._json(HTTPStatus.OK, {
-                "exists": self.deck_path.exists() or self.deck_md_path.exists(),
-                "project": project,
-                "markdown": markdown,
-                "markdownExists": self.deck_md_path.exists(),
-                # deck.md is the authoritative workspace content format.
-                # deck.json is metadata/cache and must not silently override a
-                # valid human-edited deck merely because its mtime is newer.
-                "markdownPreferred": bool(self.deck_md_path.exists()),
-                "metadataNewer": bool(self.deck_path.exists() and self.deck_md_path.exists() and json_mtime > md_mtime),
-                "jsonMtimeNs": json_mtime,
-                "markdownMtimeNs": md_mtime,
-                "revision": self._workspace_revision(),
-                "errors": errors,
-            })
+            # deck.json and deck.md are one logical deck.  The writer replaces
+            # them separately, so the read must use the same lock or it can
+            # observe one new file and one old/missing file mid-save.
+            with self.server.save_lock:  # type: ignore[attr-defined]
+                project = None
+                markdown = None
+                errors = []
+                if self.deck_path.exists():
+                    try:
+                        project = json.loads(self.deck_path.read_text("utf-8"))
+                    except Exception as exc:
+                        errors.append(f"Cannot read {DECK_FILENAME}: {exc}")
+                if self.deck_md_path.exists():
+                    try:
+                        markdown = self.deck_md_path.read_text("utf-8")
+                    except Exception as exc:
+                        errors.append(f"Cannot read {DECK_MD_FILENAME}: {exc}")
+                json_mtime = self.deck_path.stat().st_mtime_ns if self.deck_path.exists() else 0
+                md_mtime = self.deck_md_path.stat().st_mtime_ns if self.deck_md_path.exists() else 0
+                response = {
+                    "exists": self.deck_path.exists() or self.deck_md_path.exists(),
+                    "project": project,
+                    "markdown": markdown,
+                    "markdownExists": self.deck_md_path.exists(),
+                    # deck.md is the authoritative workspace content format.
+                    # deck.json is metadata/cache and must not silently override a
+                    # valid human-edited deck merely because its mtime is newer.
+                    "markdownPreferred": bool(self.deck_md_path.exists()),
+                    "metadataNewer": bool(self.deck_path.exists() and self.deck_md_path.exists() and json_mtime > md_mtime),
+                    "jsonMtimeNs": json_mtime,
+                    "markdownMtimeNs": md_mtime,
+                    "revision": self._workspace_revision(),
+                    "errors": errors,
+                }
+            return self._json(HTTPStatus.OK, response)
         if path == "/api/workspace-state":
-            files = self._workspace_files()
-            return self._json(HTTPStatus.OK, {
-                "ok": True,
-                "revision": self._workspace_revision(files),
-                "files": files,
-            })
+            with self.server.save_lock:  # type: ignore[attr-defined]
+                files = self._workspace_files()
+                response = {
+                    "ok": True,
+                    "revision": self._workspace_revision(files),
+                    "files": files,
+                }
+            return self._json(HTTPStatus.OK, response)
         if path == "/api/files":
             return self._json(HTTPStatus.OK, {"files": self._workspace_files()})
         if path == "/api/health":
@@ -412,11 +419,12 @@ class Handler(BaseHTTPRequestHandler):
                         md_tmp = self.deck_md_path.with_name(DECK_MD_FILENAME + ".tmp")
                         md_tmp.write_text(markdown, encoding="utf-8")
                         md_tmp.replace(self.deck_md_path)
+                    revision = self._workspace_revision()
                 return self._json(HTTPStatus.OK, {
                     "ok": True,
                     "deckFile": DECK_MD_FILENAME,
                     "metadataFile": DECK_FILENAME,
-                    "revision": self._workspace_revision(),
+                    "revision": revision,
                 })
             except Exception as exc:
                 return self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)})

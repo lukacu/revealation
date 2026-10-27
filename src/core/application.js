@@ -942,6 +942,8 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   let workspaceMonitorTimer = null;
   let workspaceMonitorVisibilityHandler = null;
   let workspaceMonitorBusy = false;
+  let workspaceSaveBusy = false;
+  let workspaceFlushQueue = Promise.resolve();
   let workspaceConflict = false;
   let finishWorkspaceChoice = null;
   let pwaPrepared = false;
@@ -1257,6 +1259,10 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
   async function reloadWorkspaceFromDisk() {
     if (!workspaceMode || !workspaceStorage) return;
+    // A reload must never race the final write of the current workspace.  The
+    // queue also covers explicit saves that were requested while an earlier
+    // debounced save was still in flight.
+    await workspaceFlushQueue.catch(() => {});
     hideWorkspaceConflict();
     if (saveTimer != null) { clearTimeout(saveTimer); saveTimer = null; }
     library = await loadLibrary();
@@ -1275,6 +1281,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     workspaceMonitorBusy = true;
     try {
       const current = await workspaceStorage.getWorkspaceState();
+      // The revision may have changed because of our own save while this
+      // monitor request was waiting on the storage backend.  The save updates
+      // workspaceRevision when it completes; let that result win instead of
+      // presenting a false external-change conflict.
+      if (workspaceSaveBusy) return;
       const nextRevision = current?.revision || null;
       const oldDeck = revisionToken(workspaceRevision, 'deckToken');
       const newDeck = revisionToken(nextRevision, 'deckToken');
@@ -1559,39 +1570,55 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     markDirty(id);
   }
 
-  // Flush whatever's dirty to IndexedDB. Called by scheduleSave and explicit
-  // save actions.
-  async function flushDirty({ capture = true, expectedRevision = null } = {}) {
-    if (workspaceMode) {
-      if (!state) return true;
-      if (workspaceConflict && !expectedRevision) return false;
-      try {
-        // Markdown is authoritative while its editor is open. The WYSIWYG
-        // editor remains hidden and may still contain a different slide than
-        // the one selected by the Markdown caret.
-        if (!markdownMode && capture) captureCurrentContent();
-        let markdown = null;
-        if (typeof TurndownService !== 'undefined' && typeof marked !== 'undefined') {
-          markdown = projectToMarkdown(state);
-        }
-        const expected = expectedRevision || workspaceRevision?.deckToken || null;
-        const result = await workspaceStorage.saveDeck(state, markdown, { expectedRevision: expected });
-        workspaceRevision = result?.revision || workspaceRevision;
-        hideWorkspaceConflict();
-        dirtyProjects.clear();
-        metaDirty = false;
-        setSaveState('saved', markdown == null ? 'Saved metadata to deck.json' : 'Saved to deck.md');
-        return true;
-      } catch (e) {
-        if (e?.code === 'WORKSPACE_CONFLICT') {
-          workspaceExternalRevision = e.revision?.revision || e.revision || workspaceExternalRevision;
-          showWorkspaceConflict(workspaceExternalRevision);
-          return false;
-        }
-        setSaveState('error', 'Save failed: ' + (e.message || String(e)));
-        setStatus('Save failed: ' + (e.message || String(e)), false);
+  // Flush a workspace save after all earlier workspace saves have completed.
+  // A later edit is intentionally captured when its queued turn starts, so it
+  // uses the revision returned by the preceding save rather than conflicting
+  // with it.
+  async function flushWorkspaceDirty({ capture = true, expectedRevision = null } = {}) {
+    if (!state) return true;
+    if (workspaceConflict && !expectedRevision) return false;
+    workspaceSaveBusy = true;
+    try {
+      // Markdown is authoritative while its editor is open. The WYSIWYG
+      // editor remains hidden and may still contain a different slide than
+      // the one selected by the Markdown caret.
+      if (!markdownMode && capture) captureCurrentContent();
+      let markdown = null;
+      if (typeof TurndownService !== 'undefined' && typeof marked !== 'undefined') {
+        markdown = projectToMarkdown(state);
+      }
+      const expected = expectedRevision || workspaceRevision?.deckToken || null;
+      const result = await workspaceStorage.saveDeck(state, markdown, { expectedRevision: expected });
+      workspaceRevision = result?.revision || workspaceRevision;
+      hideWorkspaceConflict();
+      dirtyProjects.clear();
+      metaDirty = false;
+      setSaveState('saved', markdown == null ? 'Saved metadata to deck.json' : 'Saved to deck.md');
+      return true;
+    } catch (e) {
+      if (e?.code === 'WORKSPACE_CONFLICT') {
+        workspaceExternalRevision = e.revision?.revision || e.revision || workspaceExternalRevision;
+        showWorkspaceConflict(workspaceExternalRevision);
         return false;
       }
+      setSaveState('error', 'Save failed: ' + (e.message || String(e)));
+      setStatus('Save failed: ' + (e.message || String(e)), false);
+      return false;
+    } finally {
+      workspaceSaveBusy = false;
+    }
+  }
+
+  // Flush whatever's dirty to IndexedDB. Called by scheduleSave and explicit
+  // save actions.
+  async function flushDirty(options = {}) {
+    if (workspaceMode) {
+      const run = workspaceFlushQueue.then(
+        () => flushWorkspaceDirty(options),
+        () => flushWorkspaceDirty(options),
+      );
+      workspaceFlushQueue = run.catch(() => {});
+      return run;
     }
     if (!browserStore?.isOpen()) {
       setSaveState('error', 'Storage unavailable');
@@ -6217,6 +6244,17 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     return Array.from(node.attributes || []).every(a => ok.has(a.name.toLowerCase()));
   }
 
+  function srOrderedListStart(node) {
+    if (!node || node.nodeName !== 'OL' || !node.hasAttribute('start')) return true;
+    const raw = node.getAttribute('start') || '';
+    const value = Number(raw);
+    // `start` is the one meaningful ordered-list attribute emitted by marked
+    // for Markdown such as `3. item`. Keep the allow-list narrow and reject
+    // malformed/unsafe values instead of treating arbitrary OL attributes as
+    // Markdown-compatible.
+    return /^[-+]?\d+$/.test(raw.trim()) && Number.isSafeInteger(value);
+  }
+
   function srAuthoredWidth(node) {
     if (!node?.hasAttribute('style')) return '';
     const style = node.style;
@@ -6517,7 +6555,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
 
       // Canonical Markdown nodes have a deliberately small attribute surface.
       if (/^H[1-6]$/.test(node.nodeName) || ['P','LI','UL','OL','BLOCKQUOTE'].includes(node.nodeName)) {
-        if (!allowedAttrs(node, ['class'])) throw markdownConversionError(node, 'Unexpected attribute.');
+        const attrs = node.nodeName === 'OL' ? ['class', 'start'] : ['class'];
+        if (!allowedAttrs(node, attrs)) throw markdownConversionError(node, 'Unexpected attribute.');
+        if (node.nodeName === 'OL' && !srOrderedListStart(node)) {
+          throw markdownConversionError(node, 'Invalid ordered-list start.');
+        }
       } else if (node.nodeName === 'A') {
         if (!allowedAttrs(node, ['href', 'title'])) throw markdownConversionError(node, 'Links may only use href/title in Markdown mode.');
       } else if (node.nodeName === 'IMG') {

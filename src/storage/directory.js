@@ -57,6 +57,17 @@
   let handleStore = null;
   let activeHandle = null;
   let recentCache = [];
+  // A deck consists of two files.  Keep reads, revision checks and writes in
+  // one queue so a load cannot observe the interval between replacing
+  // deck.json and deck.md, and concurrent saves cannot overwrite each other
+  // after both have passed the same revision check.
+  let workspaceOperation = Promise.resolve();
+
+  function withWorkspaceLock(operation) {
+    const run = workspaceOperation.then(operation, operation);
+    workspaceOperation = run.catch(() => {});
+    return run;
+  }
 
   function settleWithin(promise, label) {
     let timer = null;
@@ -435,7 +446,7 @@
   }
 
   async function loadDeck() {
-    return settleWithin(loadDeckInternal(), 'Presentation load');
+    return settleWithin(withWorkspaceLock(() => loadDeckInternal()), 'Presentation load');
   }
 
   function metadataProject(project) {
@@ -464,7 +475,7 @@
   }
 
   async function getWorkspaceState() {
-    return settleWithin(getWorkspaceStateInternal(), 'Workspace state scan');
+    return settleWithin(withWorkspaceLock(() => getWorkspaceStateInternal()), 'Workspace state scan');
   }
 
   async function saveDeck(project, markdown, { expectedRevision = null } = {}) {
@@ -472,24 +483,30 @@
     // user opens the Change folder picker while a final save is in flight:
     // that save must finish in the old workspace even if the picker resolves.
     const root = requireHandle();
-    const expectedToken = expectedRevision?.deckToken || expectedRevision || null;
-    if (expectedToken) {
-      const currentToken = await settleWithin(deckRevision(), 'Presentation revision check');
-      if (currentToken !== expectedToken) {
-        const error = new Error('The presentation changed on disk.');
-        error.code = 'WORKSPACE_CONFLICT';
-        error.revision = await getWorkspaceState();
-        throw error;
+    // Snapshot the payload too: callers keep the mutable in-memory project
+    // object while this operation waits behind another save.
+    const projectData = JSON.stringify(metadataProject(project), null, 2);
+    const markdownData = typeof markdown === 'string' ? markdown : null;
+    return settleWithin(withWorkspaceLock(async () => {
+      const expectedToken = expectedRevision?.deckToken || expectedRevision || null;
+      if (expectedToken) {
+        const currentToken = await settleWithin(deckRevision(), 'Presentation revision check');
+        if (currentToken !== expectedToken) {
+          const error = new Error('The presentation changed on disk.');
+          error.code = 'WORKSPACE_CONFLICT';
+          error.revision = await getWorkspaceStateInternal();
+          throw error;
+        }
       }
-    }
-    await writeFile(DECK_FILENAME, JSON.stringify(metadataProject(project), null, 2), root);
-    if (typeof markdown === 'string') await writeFile(DECK_MD_FILENAME, markdown, root);
-    return {
-      ok: true,
-      deckFile: DECK_MD_FILENAME,
-      metadataFile: DECK_FILENAME,
-      revision: (await getWorkspaceState()).revision,
-    };
+      await writeFile(DECK_FILENAME, projectData, root);
+      if (markdownData !== null) await writeFile(DECK_MD_FILENAME, markdownData, root);
+      return {
+        ok: true,
+        deckFile: DECK_MD_FILENAME,
+        metadataFile: DECK_FILENAME,
+        revision: (await getWorkspaceStateInternal()).revision,
+      };
+    }), 'Presentation save');
   }
 
   function inferMime(name, fallback = '') {

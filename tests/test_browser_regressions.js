@@ -929,6 +929,24 @@ async function main() {
     assert(/Parent[\s\S]*\n\s{2,}[-*+]\s+\*\*Child\*\*/.test(nestedListCodec.markdown), `nested list indentation was lost in Markdown serialization: ${nestedListCodec.markdown}`);
     assert(nestedListCodec.reparsed.includes('<ul>') && nestedListCodec.reparsed.includes('<strong>Child</strong>'), `nested list formatting did not survive Markdown round trip: ${nestedListCodec.reparsed}`);
 
+    // Marked preserves an ordered list that starts above 1 with an `ol start`
+    // attribute. That is valid Markdown semantics, not arbitrary raw HTML,
+    // and must survive the strict HTML -> Markdown safety check.
+    const startedOrderedList = await evaluate(`(() => {
+      const source = '3. Third\\n4. Fourth';
+      const html = __revealationRegression.markdownToHtml(source);
+      const holder = document.createElement('div');
+      holder.innerHTML = html;
+      const list = holder.querySelector('ol');
+      let markdown = '', error = '';
+      try { markdown = __revealationRegression.htmlToMarkdown(html, __revealationRegression.makeMarkdownTurndown()).trim(); }
+      catch (e) { error = e.message || String(e); }
+      return { start: list?.getAttribute('start') || '', markdown, error };
+    })()`);
+    assert(!startedOrderedList.error, `ordered list with a non-1 start failed to serialize: ${startedOrderedList.error}`);
+    assert(startedOrderedList.start === '3' && /^3\.\s+Third/.test(startedOrderedList.markdown),
+      `ordered-list start numbering was not preserved: ${JSON.stringify(startedOrderedList)}`);
+
     // Cropped images use an editor-only wrapper, but the Markdown codec owns
     // that wrapper and must emit/consume the compact crop attribute instead
     // of falling back to unsupported raw HTML.
