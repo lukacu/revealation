@@ -89,18 +89,6 @@
       <button id="btn-slides-close" type="button" class="sidebar-close" aria-label="Close slide list"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
     </div>
     <ol id="slide-list" class="slide-list"></ol>
-    <div class="sidebar-foot" aria-label="Deck information">
-      <div class="deck-stats" aria-label="Deck statistics">
-        <span><strong id="deck-slide-count">0</strong><small>slides</small></span>
-        <span><strong id="deck-active-slide-count">0</strong><small>active</small></span>
-        <span><strong id="deck-hidden-slide-count">0</strong><small>hidden</small></span>
-      </div>
-      <div class="sidebar-save-state">
-        <span id="save-indicator" class="save-indicator" data-state="saved" role="status" aria-live="polite" aria-label="Saved" title="Saved">
-          <i class="bi bi-check-circle-fill" aria-hidden="true"></i><span id="save-label">Saved</span>
-        </span>
-      </div>
-    </div>
   </aside>
 
   <section class="editor">
@@ -260,6 +248,23 @@
 
   <div id="mobile-scrim" class="mobile-scrim" hidden></div>
 </main>
+
+<footer class="app-footer" aria-label="Presentation status">
+  <span id="save-indicator" class="save-indicator" data-state="saved" role="status" aria-live="polite" aria-label="Saved" title="Saved">
+    <i class="bi bi-check-circle-fill" aria-hidden="true"></i><span id="save-label">Saved</span>
+  </span>
+  <div class="app-footer-stats" aria-label="Presentation statistics">
+    <span class="app-footer-stat deck-slide-stat">
+      <strong id="deck-visible-slide-count">0</strong><span>slides</span>
+      <span id="deck-total-slide-count" class="deck-total-slide-count" hidden>(<span id="deck-slide-count">0</span> total)</span>
+    </span>
+  </div>
+  <div id="deck-completion" class="deck-completion" aria-label="Presentation completeness" hidden>
+    <span class="deck-completion-title">Completeness</span>
+    <progress id="deck-completion-progress" class="deck-completion-progress" max="100" value="0" aria-label="Presentation completeness">0%</progress>
+    <span id="deck-completion-value" class="deck-completion-value">0%</span>
+  </div>
+</footer>
 
 <div id="present-modal" class="modal present-modal" hidden>
   <!-- Deliberately NOT sandboxed — Chrome's PDF viewer refuses to render

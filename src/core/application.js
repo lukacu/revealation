@@ -160,8 +160,11 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
     styleLayoutForm: $('#style-layout-form'),
     slideList: $('#slide-list'),
     deckSlideCount: $('#deck-slide-count'),
-    deckActiveSlideCount: $('#deck-active-slide-count'),
-    deckHiddenSlideCount: $('#deck-hidden-slide-count'),
+    deckVisibleSlideCount: $('#deck-visible-slide-count'),
+    deckTotalSlideCount: $('#deck-total-slide-count'),
+    deckCompletion: $('#deck-completion'),
+    deckCompletionProgress: $('#deck-completion-progress'),
+    deckCompletionValue: $('#deck-completion-value'),
     addSlide: $('#btn-add-slide'),
     editor: $('#slide-editor'),
     toolbar: $('#toolbar'),
@@ -1742,9 +1745,23 @@ html.reveal-print .reveal pre.sr-code{width:100%!important;max-width:100%!import
   function renderSidebar() {
     const total = state?.slides?.length || 0;
     const hidden = state?.slides?.filter(slide => slide.hidden).length || 0;
+    const visible = total - hidden;
+    const wip = state?.slides?.filter(slide => slide.underConstruction === true).length || 0;
     if (els.deckSlideCount) els.deckSlideCount.textContent = String(total);
-    if (els.deckActiveSlideCount) els.deckActiveSlideCount.textContent = String(total - hidden);
-    if (els.deckHiddenSlideCount) els.deckHiddenSlideCount.textContent = String(hidden);
+    if (els.deckVisibleSlideCount) els.deckVisibleSlideCount.textContent = String(visible);
+    if (els.deckTotalSlideCount) els.deckTotalSlideCount.hidden = visible === total;
+    if (els.deckCompletion) {
+      const hasWip = wip > 0;
+      const completePercent = total > 0 ? Math.round(((total - wip) / total) * 100) : 0;
+      els.deckCompletion.hidden = !hasWip;
+      if (hasWip) {
+        els.deckCompletionProgress.value = completePercent;
+        els.deckCompletionProgress.textContent = `${completePercent}%`;
+        els.deckCompletionProgress.setAttribute('aria-valuenow', String(completePercent));
+        els.deckCompletionProgress.setAttribute('aria-valuetext', `${completePercent}% complete`);
+        els.deckCompletionValue.textContent = `${completePercent}%`;
+      }
+    }
     if (markdownMode) { renderMarkdownSidebar(); return; }
     const validIds = new Set(state.slides.map(slide => slide.id));
     selectedSlideIds = selectedSlideIds.filter(id => validIds.has(id));

@@ -317,13 +317,13 @@ textarea { resize: vertical; }
   line-height: 34px;
 }
 .save-indicator {
-  width: 24px;
-  height: 34px;
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex: 0 0 auto;
   color: var(--ok);
-  font-size: 14px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 .save-indicator[data-state="saving"] { color: var(--muted); }
 .save-indicator[data-state="saving"] .bi { animation: save-spin 1s linear infinite; }
@@ -412,36 +412,66 @@ body.notes-open .layout {
   overflow-y: auto;
   flex: 1;
 }
-.sidebar-foot {
-  flex: 0 0 auto;
-  padding: 10px 12px 12px;
-  border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--panel) 92%, var(--panel-2));
-}
-.deck-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-bottom: 9px;
-}
-.deck-stats span {
+.app-footer {
   display: flex;
-  flex-direction: column;
-  min-width: 0;
+  align-items: center;
+  gap: 18px;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
 }
-.deck-stats strong { font-size: 15px; line-height: 1.1; }
-.deck-stats small { margin-top: 2px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
-.sidebar-save-state { display: flex; align-items: center; min-height: 22px; }
-.sidebar-save-state .save-indicator {
-  width: auto;
-  height: 22px;
+.app-footer .save-indicator .bi { font-size: 12px; }
+.app-footer-stats {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.app-footer-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+.app-footer-stat strong {
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.deck-total-slide-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.deck-completion {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-  font-size: 12px;
+  gap: 8px;
+  min-width: min(250px, 30vw);
+  margin-left: auto;
+  white-space: nowrap;
 }
-.sidebar-save-state .save-indicator .bi { font-size: 13px; }
+.deck-completion-title { color: var(--muted); }
+.deck-completion-progress {
+  width: min(220px, 22vw);
+  height: 5px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--panel-2);
+  accent-color: #f59e0b;
+}
+.deck-completion-progress::-webkit-progress-bar { background: var(--panel-2); border-radius: 999px; }
+.deck-completion-progress::-webkit-progress-value { background: #f59e0b; border-radius: 999px; }
+.deck-completion-progress::-moz-progress-bar { background: #f59e0b; border-radius: 999px; }
+.deck-completion-value {
+  min-width: 30px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
 .add-slide {
   width: 26px;
   height: 26px;
@@ -484,17 +514,6 @@ body.notes-open .layout {
 .slide-list li.under-construction.active {
   border-color: #f59e0b;
   box-shadow: 0 0 0 1px #f59e0b inset;
-}
-.construction-badge {
-  flex: 0 0 auto;
-  padding: 2px 5px;
-  border-radius: 4px;
-  background: #f59e0b;
-  color: #241300;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .04em;
-  line-height: 1.2;
 }
 .slide-list li.slide-hidden {
   opacity: .7;
@@ -2064,7 +2083,6 @@ kbd {
     padding: 0 4px;
     line-height: 36px;
   }
-  #save-indicator { width: 20px; }
   #btn-deck-settings,
   #btn-export,
   #btn-undo,
@@ -2167,8 +2185,17 @@ kbd {
     color: var(--muted);
     font-size: 16px;
   }
-  .sidebar-foot { padding: 10px 12px; }
-  .sidebar-foot button { font-size: 14px; padding: 6px 8px; }
+  .app-footer {
+    gap: 12px;
+    min-height: 34px;
+    padding: 5px 10px;
+    padding-bottom: max(5px, env(safe-area-inset-bottom));
+    overflow-x: auto;
+  }
+  .app-footer-stats { gap: 10px; }
+  .deck-completion { min-width: 190px; }
+  .deck-completion-title { display: none; }
+  .deck-completion-progress { width: 130px; }
 
   .mobile-scrim {
     display: block;

@@ -384,14 +384,6 @@
         if (renderLabel) renderLabel(label, descriptor);
         else label.textContent = descriptor?.text || 'Slide';
         li.append(num);
-        if (slide?.underConstruction === true) {
-          const badge = document.createElement('span');
-          badge.className = 'construction-badge';
-          badge.textContent = 'WIP';
-          badge.title = 'Under construction';
-          badge.setAttribute('aria-label', 'Under construction');
-          li.appendChild(badge);
-        }
         if (slide?.hidden === true) {
           const badge = document.createElement('span');
           badge.className = 'hidden-slide-badge';
@@ -401,7 +393,7 @@
           li.appendChild(badge);
         }
         li.appendChild(label);
-        li.title = `${slide?.underConstruction === true ? 'Under construction · ' : ''}${slide?.hidden === true ? 'Hidden · ' : ''}${label.textContent.trim()}`;
+        li.title = `${label.textContent.trim()}${slide?.underConstruction === true ? ' (under construction)' : ''}${slide?.hidden === true ? ' · hidden' : ''}`;
 
         const rowMenu = document.createElement('button');
         rowMenu.type = 'button';
@@ -541,14 +533,6 @@
         label.className = 'label';
         label.textContent = item.label || `Slide ${index + 1}`;
         li.append(num);
-        if (underConstruction) {
-          const badge = document.createElement('span');
-          badge.className = 'construction-badge';
-          badge.textContent = 'WIP';
-          badge.title = 'Under construction';
-          badge.setAttribute('aria-label', 'Under construction');
-          li.appendChild(badge);
-        }
         if (hidden) {
           const badge = document.createElement('span');
           badge.className = 'hidden-slide-badge';
@@ -558,7 +542,7 @@
           li.appendChild(badge);
         }
         li.appendChild(label);
-        li.title = `${underConstruction ? 'Under construction · ' : ''}${hidden ? 'Hidden · ' : ''}${label.textContent}`;
+        li.title = `${label.textContent}${underConstruction ? ' (under construction)' : ''}${hidden ? ' · hidden' : ''}`;
         if (view === 'thumbnails') addThumbnail(li, slide, Number(width) || 960, Number(height) || 700, index);
         li.tabIndex = 0;
         const jump = () => onJump(index);
