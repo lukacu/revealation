@@ -389,6 +389,72 @@ async function main() {
     await evaluate(applicationSource + '\n//# sourceURL=src/core/application-regression.js');
     await evaluate(`Revealation.ui.applyToolbarLayout()`);
 
+    const paragraphUndoProbe = await evaluate(`(() => {
+      const cases = [
+        {
+          name: 'single slide',
+          source: 'A paragraph with enough text to split and rejoin safely.',
+          host: '#slide-editor',
+          projectId: 'paragraph-probe-single',
+        },
+        {
+          name: 'layout block',
+          source: [
+            '--- layout=header-body', '',
+            '::: block', '# A heading', ':::', '',
+            '::: block', 'A paragraph with enough text to split and rejoin safely.', ':::',
+          ].join('\\n'),
+          host: '[data-slot="body"] .sr-layout-content',
+          projectId: 'paragraph-probe-layout',
+        },
+      ];
+      const results = cases.flatMap(testCase => {
+        const textLength = 'A paragraph with enough text to split and rejoin safely.'.length;
+        return [1, Math.floor(textLength / 2), textLength - 1].map(offset => {
+          let error = '', html = '', stored = '', markdown = '';
+          try {
+            const slides = __revealationRegression.parseMarkdownDeck(testCase.source);
+            const project = { id:testCase.projectId + '-' + offset, title:'Probe', name:'Probe', theme:'clean', slides, currentId:slides[0].id, config:{} };
+            __revealationRegression.setTestState(project);
+            __revealationRegression.renderEditor();
+            const host = document.querySelector(testCase.host);
+            const text = host.querySelector('p').firstChild;
+            const range = document.createRange(); range.setStart(text, offset); range.collapse(true);
+            const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range); host.focus();
+            document.execCommand('insertParagraph', false, null);
+            document.execCommand('delete', false, null);
+            __revealationRegression.onEditorInput({ target: host });
+            html = host.innerHTML;
+            stored = slides[0].content;
+            markdown = __revealationRegression.projectToMarkdown(project);
+          } catch (e) { error = e.message || String(e); }
+          return { name:testCase.name + ' at offset ' + offset, error, html, stored, markdown };
+        });
+      });
+      return results;
+    })()`);
+    paragraphUndoProbe.forEach(result => {
+      assert(!result.error, `${result.name} paragraph split/delete failed to serialize: ${result.error} HTML=${result.html} STORED=${result.stored}`);
+      assert(!/style="[^"]*font-size/i.test(result.stored), `${result.name} persisted a browser font-size artifact: ${result.stored}`);
+    });
+
+    const intentionalSpanNormalization = await evaluate(`(() => {
+      const root = document.createElement('div');
+      root.className = 'slide-editor';
+      root.innerHTML = '<p>Keep <span style="font-size: 7.07px;">plain text</span>.</p>'
+        + '<span class="sr-math" data-display="0" data-tex="x" style="font-size: 7.07px;"></span>'
+        + '<div class="sr-html-block"><span style="font-size: 7.07px;">raw</span></div>';
+      Revealation.editor.contentNormalization.normalizeForSerialization(root);
+      return {
+        plain: root.querySelector('p')?.innerHTML || '',
+        math: root.querySelector('.sr-math')?.outerHTML || '',
+        raw: root.querySelector('.sr-html-block')?.innerHTML || '',
+      };
+    })()`);
+    assert(!/font-size/i.test(intentionalSpanNormalization.plain), 'browser font-size span was not removed from plain editor text');
+    assert(intentionalSpanNormalization.math.includes('data-tex="x"') && /font-size/i.test(intentionalSpanNormalization.math), 'math span was incorrectly normalized');
+    assert(/font-size/i.test(intentionalSpanNormalization.raw), 'explicit raw HTML span was incorrectly normalized');
+
     // RV-COMPAT(theme-reveal-aliases), RV-COMPAT(theme-custom): compatibility migration coverage.
     // Manifest-backed themes are presentation-level metadata. Legacy reveal
     // theme names migrate deterministically and unknown ids fall back safely.

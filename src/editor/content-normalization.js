@@ -45,6 +45,7 @@
   if (!app) throw new Error('Revealation namespace must be loaded first.');
 
   const HOST_SELECTOR = [
+    '.slide-editor',
     '.sr-layout-content',
     // RV-COMPAT(columns-directive): REMOVE old `.sr-col` host BEFORE PUBLIC RELEASE.
     '.sr-col',
@@ -326,6 +327,27 @@
     parent.replaceChild(fragment, div);
   }
 
+  function normalizeBrowserStyleSpans(root) {
+    if (!root) return;
+    const hosts = [];
+    if (root.matches?.(HOST_SELECTOR)) hosts.push(root);
+    root.querySelectorAll?.(HOST_SELECTOR).forEach(host => hosts.push(host));
+    hosts.forEach(host => {
+      host.querySelectorAll('span').forEach(span => {
+        // Chromium can preserve the scaled editor font as an inline span when
+        // Enter is followed immediately by Backspace. It is not authored
+        // content and has no Markdown representation. Keep this narrow so
+        // intentional/raw HTML and structured spans (for example math) stay
+        // untouched.
+        if (span.closest('.sr-html-block')) return;
+        if (span.attributes.length !== 1 || !span.hasAttribute('style')) return;
+        const properties = Array.from(span.style).map(name => name.toLowerCase());
+        if (properties.length !== 1 || properties[0] !== 'font-size') return;
+        unwrap(span);
+      });
+    });
+  }
+
   function normalizeHost(host) {
     if (!host) return;
     // Multiple passes handle nested browser wrappers such as
@@ -352,6 +374,7 @@
     if (!root) return root;
     const includeRoot = options.includeRoot !== false;
     normalizeInlineAliases(root);
+    normalizeBrowserStyleSpans(root);
     root.querySelectorAll?.('ul, ol').forEach(normalizeList);
     // LI is itself a browser editing boundary in practice: Enter/paste can
     // leave attribute-free DIV wrappers inside an otherwise valid list.
