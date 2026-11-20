@@ -58,6 +58,10 @@ When `chromium` is available, `check.sh` runs two headless Chromium suites throu
 
 The test uses no npm packages and does not need network access.
 
+The Chromium runners allow 90 seconds for the DevTools endpoint to appear on
+slow CI workers. Override that budget with
+`REVEALATION_CHROMIUM_STARTUP_TIMEOUT_MS` when needed.
+
 
 ## Alignment/UI regressions
 

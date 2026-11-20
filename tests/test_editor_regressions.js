@@ -14,6 +14,7 @@ const { spawn } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 const PORT = 9537 + (process.pid % 200);
 const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), 'revealation-editor-chrome-'));
+const CHROMIUM_STARTUP_TIMEOUT_MS = Number(process.env.REVEALATION_CHROMIUM_STARTUP_TIMEOUT_MS) || 90000;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
@@ -31,7 +32,8 @@ async function stopChrome(chrome) {
 }
 
 async function waitForTarget(chrome, getStderr) {
-  for (let i = 0; i < 300; i += 1) {
+  const deadline = Date.now() + CHROMIUM_STARTUP_TIMEOUT_MS;
+  while (Date.now() < deadline) {
     if (chrome.exitCode !== null) {
       throw new Error(`Chromium exited before its DevTools endpoint became ready (code ${chrome.exitCode}).${getStderr()}`);
     }
@@ -44,7 +46,7 @@ async function waitForTarget(chrome, getStderr) {
     } catch (_) {}
     await sleep(100);
   }
-  throw new Error(`Chromium DevTools endpoint did not become ready after 30 seconds.${getStderr()}`);
+  throw new Error(`Chromium DevTools endpoint did not become ready after ${Math.round(CHROMIUM_STARTUP_TIMEOUT_MS / 1000)} seconds.${getStderr()}`);
 }
 
 async function main() {
